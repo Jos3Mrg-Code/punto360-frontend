@@ -32,6 +32,7 @@ const SuperAdminClientDetailPage = lazy(() => import('./pages/superadmin/SuperAd
 const VerifyEmailPage            = lazy(() => import('./pages/VerifyEmailPage'));
 const PlanesPage                 = lazy(() => import('./pages/PlanesPage'));
 const PagoExitosoPage            = lazy(() => import('./pages/PagoExitosoPage'));
+const CuentaPage                 = lazy(() => import('./pages/CuentaPage'));
 
 // Spinner mostrado mientras se descarga un chunk
 function PageLoader() {
@@ -92,6 +93,7 @@ const AppRoutes = () => {
             <Route path="/verify-email" element={<VerifyEmailPage />} />
             <Route path="/planes" element={<PrivateRoute><PlanesPage /></PrivateRoute>} />
             <Route path="/pago-exitoso" element={<PrivateRoute><PagoExitosoPage /></PrivateRoute>} />
+            <Route path="/cuenta" element={<PrivateRoute><CuentaPage /></PrivateRoute>} />
             <Route path="/" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
             <Route path="/ventas" element={<PrivateRoute><PosPage /></PrivateRoute>} />
             <Route path="/historial" element={<PrivateRoute><SalesHistoryPage /></PrivateRoute>} />

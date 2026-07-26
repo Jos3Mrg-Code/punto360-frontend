@@ -3,6 +3,7 @@ import { Bell, LogOut, Search, Menu } from "lucide-react";
 import { useAuth } from "../auth/AuthContext";
 import { useNotifications } from "../hooks/useNotifications";
 import NotificationDropdown from "./NotificationDropdown";
+import { useNavigate } from 'react-router-dom';
 
 interface TopbarProps {
     onOpenMobileMenu?: () => void;
@@ -12,6 +13,7 @@ export default function Topbar({ onOpenMobileMenu }: TopbarProps) {
     const { user, logout } = useAuth();
     const { count, notifications } = useNotifications();
     const [dropdownOpen, setDropdownOpen] = useState(false);
+    const navigate = useNavigate();
 
     return (
         <header className="fixed top-0 right-0 h-20 bg-transparent z-40 flex items-center justify-between px-4 md:px-8 pointer-events-none transition-all duration-300"
@@ -62,11 +64,12 @@ export default function Topbar({ onOpenMobileMenu }: TopbarProps) {
                     )}
                 </div>
 
-                <div className="flex items-center gap-3 md:gap-4 bg-app-card backdrop-blur-md border border-app-border p-1 md:p-1.5 md:pr-4 rounded-2xl shadow-xl">
+                <button onClick={() => navigate('/cuenta')}
+                    className="flex items-center gap-3 md:gap-4 bg-app-card backdrop-blur-md border border-app-border p-1 md:p-1.5 md:pr-4 rounded-2xl shadow-xl hover:border-app-accent/50 transition-all">
                     <div className="w-8 h-8 md:w-10 md:h-10 rounded-xl bg-app-accent flex items-center justify-center text-xs md:text-sm font-bold text-white shadow-lg overflow-hidden border border-app-border shrink-0">
                         {user?.userName?.charAt(0).toUpperCase() || "U"}
                     </div>
-                    <div className="hidden lg:flex flex-col">
+                    <div className="hidden lg:flex flex-col text-left">
                         <span className="text-xs font-bold text-app-text tracking-wide">
                             {user?.userName || "Usuario"}
                         </span>
@@ -74,7 +77,7 @@ export default function Topbar({ onOpenMobileMenu }: TopbarProps) {
                             {user?.companyName || "Empresa"}
                         </span>
                     </div>
-                </div>
+                </button>
 
                 <button
                     onClick={logout}
