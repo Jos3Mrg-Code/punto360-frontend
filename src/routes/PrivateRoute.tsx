@@ -7,7 +7,9 @@ interface Props {
 }
 
 const PrivateRoute = ({ children }: Props) => {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, ready } = useAuth();
+
+  if (!ready) return null;
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;

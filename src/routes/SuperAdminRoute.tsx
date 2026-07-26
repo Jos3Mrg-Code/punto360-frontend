@@ -3,8 +3,9 @@ import { useAuth } from '../auth/AuthContext';
 import type { ReactNode } from 'react';
 
 export default function SuperAdminRoute({ children }: { children: ReactNode }) {
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, ready, user } = useAuth();
 
+  if (!ready) return null;
   if (!isAuthenticated) return <Navigate to="/login" replace />;
   if (user?.role !== 'SUPERADMIN') return <Navigate to="/" replace />;
 

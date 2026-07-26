@@ -13,13 +13,23 @@ const AuthContext = createContext<AuthContextType | null>(null);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const [user, setUser] = useState<User | null>(null);
+    const [ready, setReady] = useState(false);
 
     useEffect(() => {
         const token = localStorage.getItem('token');
         if (token) {
-            const decoded = jwtDecode<User>(token);
-            setUser(decoded);
+            try {
+                const decoded = jwtDecode<User & { exp: number }>(token);
+                if (decoded.exp * 1000 > Date.now()) {
+                    setUser(decoded);
+                } else {
+                    localStorage.removeItem('token');
+                }
+            } catch {
+                localStorage.removeItem('token');
+            }
         }
+        setReady(true);
     }, []);
 
     const login = async (email: string, password: string): Promise<string | null> => {
@@ -46,6 +56,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             value={{
                 user,
                 isAuthenticated: !!user,
+                ready,
                 login,
                 logout,
                 hasPermission,
