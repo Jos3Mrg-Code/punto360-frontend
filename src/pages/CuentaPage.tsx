@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
-    User, Building2, GitBranch, Save, Lock, Plus, Pencil,
+    User, Building2, GitBranch, Save, Plus, Pencil,
     Trash2, X, Check, Loader2, CreditCard, Zap, Star, Crown, ArrowRight,
 } from 'lucide-react';
 import { api } from '../api/axios';
