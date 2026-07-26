@@ -4,6 +4,7 @@ import {
     Trash2, X, Check, Loader2, CreditCard, Zap, Star, Crown, ArrowRight,
 } from 'lucide-react';
 import { api } from '../api/axios';
+import DashboardLayout from '../layouts/DashboardLayout';
 
 type Tab = 'perfil' | 'empresa' | 'sucursales' | 'planes';
 
@@ -425,30 +426,34 @@ export default function CuentaPage() {
     const [tab, setTab] = useState<Tab>('perfil');
 
     return (
-        <div>
-            <div className="mb-6">
-                <h1 className="text-2xl font-bold text-app-text">Mi cuenta</h1>
-                <p className="text-sm text-app-text-muted mt-1">Gestiona tu perfil, empresa, sucursales y suscripción.</p>
-            </div>
+        <DashboardLayout>
+            <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                    <h1 className="text-3xl font-bold text-app-text flex items-center gap-3">
+                        <User size={32} className="text-cyan-400" />
+                        Mi cuenta
+                    </h1>
+                    <p className="text-app-text-muted mt-1">Gestiona tu perfil, empresa, sucursales y suscripción.</p>
+                </div>
 
-            {/* Pestañas */}
-            <div className="flex gap-1 mb-8 bg-app-card border border-app-border p-1 rounded-xl w-fit flex-wrap">
-                {TABS.map(({ key, label, icon: Icon }) => (
-                    <button key={key} onClick={() => setTab(key)}
-                        className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                            tab === key
-                                ? 'bg-app-accent text-white shadow'
-                                : 'text-app-text-muted hover:text-app-text hover:bg-app-bg'
-                        }`}>
-                        <Icon size={15} /> {label}
-                    </button>
-                ))}
+                <div className="flex bg-app-card p-1 rounded-xl border border-app-border self-start flex-wrap gap-0.5">
+                    {TABS.map(({ key, label }) => (
+                        <button key={key} onClick={() => setTab(key)}
+                            className={`px-5 py-2 rounded-lg text-sm font-bold transition-all ${
+                                tab === key
+                                    ? 'bg-cyan-500 text-white shadow-lg shadow-cyan-500/20'
+                                    : 'text-app-text-muted hover:text-app-text'
+                            }`}>
+                            {label}
+                        </button>
+                    ))}
+                </div>
             </div>
 
             {tab === 'perfil'     && <PerfilTab />}
             {tab === 'empresa'    && <EmpresaTab />}
             {tab === 'sucursales' && <SucursalesTab />}
             {tab === 'planes'     && <PlanesTab />}
-        </div>
+        </DashboardLayout>
     );
 }
