@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 import Topbar from "../components/Topbar";
 import Sidebar from "../components/Sidebar";
+import SubscriptionBanner from "../components/SubscriptionBanner";
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -30,6 +31,8 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                 </main>
             </div>
             
+            <SubscriptionBanner />
+
             {/* Overlay for mobile sidebar */}
             {isMobileMenuOpen && (
                 <div 

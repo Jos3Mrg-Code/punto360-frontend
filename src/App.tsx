@@ -29,6 +29,9 @@ const SuperAdminLayout         = lazy(() => import('./pages/superadmin/SuperAdmi
 const SuperAdminDashboardPage  = lazy(() => import('./pages/superadmin/SuperAdminDashboardPage'));
 const SuperAdminNewClientPage  = lazy(() => import('./pages/superadmin/SuperAdminNewClientPage'));
 const SuperAdminClientDetailPage = lazy(() => import('./pages/superadmin/SuperAdminClientDetailPage'));
+const VerifyEmailPage            = lazy(() => import('./pages/VerifyEmailPage'));
+const PlanesPage                 = lazy(() => import('./pages/PlanesPage'));
+const PagoExitosoPage            = lazy(() => import('./pages/PagoExitosoPage'));
 
 // Spinner mostrado mientras se descarga un chunk
 function PageLoader() {
@@ -86,6 +89,9 @@ const AppRoutes = () => {
           <Routes>
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
+            <Route path="/verify-email" element={<VerifyEmailPage />} />
+            <Route path="/planes" element={<PrivateRoute><PlanesPage /></PrivateRoute>} />
+            <Route path="/pago-exitoso" element={<PrivateRoute><PagoExitosoPage /></PrivateRoute>} />
             <Route path="/" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
             <Route path="/ventas" element={<PrivateRoute><PosPage /></PrivateRoute>} />
             <Route path="/historial" element={<PrivateRoute><SalesHistoryPage /></PrivateRoute>} />
