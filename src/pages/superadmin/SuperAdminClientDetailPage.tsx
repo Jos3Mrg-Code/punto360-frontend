@@ -3,7 +3,14 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Users, GitBranch, PlusCircle, CheckCircle, Clock, Loader2 } from 'lucide-react';
 import { api } from '../../api/axios';
 
-interface Subscription { id: string; start_date: string; end_date: string; amount: number; status: string; notes: string | null; }
+interface Subscription { id: string; plan: string; start_date: string; end_date: string; amount: number; status: string; notes: string | null; }
+
+const planLabel: Record<string, string> = { TRIAL: 'Trial', ANNUAL: 'Anual', MONTHLY: 'Mensual' };
+const planClass: Record<string, string> = {
+  TRIAL:   'text-amber-400 bg-amber-500/10 border-amber-500/20',
+  ANNUAL:  'text-violet-400 bg-violet-500/10 border-violet-500/20',
+  MONTHLY: 'text-blue-400 bg-blue-500/10 border-blue-500/20',
+};
 interface Branch { id: string; name: string; is_active: boolean; address: string | null; }
 interface UserEntry { id: string; name: string; email: string; is_active: boolean; user_roles: { roles: { name: string } }[]; }
 interface ClientDetail {
@@ -110,7 +117,12 @@ export default function SuperAdminClientDetailPage() {
             return (
               <div key={s.id} className="flex items-center justify-between py-3 border-b border-app-border last:border-0">
                 <div>
-                  <p className="text-sm font-medium text-app-text">{fmtCOP(s.amount)}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-medium text-app-text">{fmtCOP(s.amount)}</p>
+                    <span className={`text-[10px] px-2 py-0.5 rounded-md font-semibold border ${planClass[s.plan] ?? 'text-app-text-muted bg-white/5 border-app-border'}`}>
+                      {planLabel[s.plan] ?? s.plan}
+                    </span>
+                  </div>
                   <p className="text-xs text-app-text-muted">{fmt(s.start_date)} → {fmt(s.end_date)}</p>
                   {s.notes && <p className="text-xs text-app-text-muted italic mt-0.5">{s.notes}</p>}
                 </div>

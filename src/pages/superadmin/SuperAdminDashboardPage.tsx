@@ -5,11 +5,23 @@ import { api } from '../../api/axios';
 
 interface Subscription {
   id: string;
+  plan: string;
   start_date: string;
   end_date: string;
   amount: number;
   status: string;
 }
+
+const planLabel: Record<string, string> = {
+  TRIAL:   'Trial',
+  ANNUAL:  'Anual',
+  MONTHLY: 'Mensual',
+};
+const planClass: Record<string, string> = {
+  TRIAL:   'text-amber-400 bg-amber-500/10 border-amber-500/20',
+  ANNUAL:  'text-violet-400 bg-violet-500/10 border-violet-500/20',
+  MONTHLY: 'text-blue-400 bg-blue-500/10 border-blue-500/20',
+};
 
 interface Client {
   id: string;
@@ -140,14 +152,21 @@ export default function SuperAdminDashboardPage() {
                   </div>
                 </div>
 
-                {/* Suscripción */}
-                <div className="shrink-0 text-right hidden sm:block">
-                  <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border ${cfg.className}`}>
-                    <cfg.Icon size={11} />
-                    {cfg.label}
-                  </span>
+                {/* Plan + Suscripción */}
+                <div className="shrink-0 text-right hidden sm:block space-y-1">
+                  <div className="flex items-center justify-end gap-1.5">
+                    {client.lastSubscription && (
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold border ${planClass[client.lastSubscription.plan] ?? 'text-app-text-muted bg-white/5 border-app-border'}`}>
+                        {planLabel[client.lastSubscription.plan] ?? client.lastSubscription.plan}
+                      </span>
+                    )}
+                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border ${cfg.className}`}>
+                      <cfg.Icon size={11} />
+                      {cfg.label}
+                    </span>
+                  </div>
                   {client.lastSubscription && (
-                    <p className="text-[10px] text-app-text-muted mt-1">
+                    <p className="text-[10px] text-app-text-muted">
                       Vence: {fmt(client.lastSubscription.end_date)}
                       {client.daysRemaining !== null && client.daysRemaining > 0 && (
                         <span className="ml-1">({client.daysRemaining}d)</span>
