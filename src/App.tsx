@@ -33,6 +33,8 @@ const VerifyEmailPage            = lazy(() => import('./pages/VerifyEmailPage'))
 const PlanesPage                 = lazy(() => import('./pages/PlanesPage'));
 const PagoExitosoPage            = lazy(() => import('./pages/PagoExitosoPage'));
 const CuentaPage                 = lazy(() => import('./pages/CuentaPage'));
+const ForgotPasswordPage         = lazy(() => import('./pages/ForgotPasswordPage'));
+const ResetPasswordPage          = lazy(() => import('./pages/ResetPasswordPage'));
 
 // Spinner mostrado mientras se descarga un chunk
 function PageLoader() {
@@ -91,6 +93,8 @@ const AppRoutes = () => {
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/verify-email" element={<VerifyEmailPage />} />
+            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
             <Route path="/planes" element={<PrivateRoute><PlanesPage /></PrivateRoute>} />
             <Route path="/pago-exitoso" element={<PrivateRoute><PagoExitosoPage /></PrivateRoute>} />
             <Route path="/cuenta" element={<PrivateRoute><CuentaPage /></PrivateRoute>} />

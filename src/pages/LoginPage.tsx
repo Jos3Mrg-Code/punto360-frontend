@@ -101,8 +101,14 @@ export default function LoginPage() {
                             </button>
                         </div>
 
-                        <button 
-                            type="submit" 
+                        <div className="flex justify-end -mt-1">
+                            <Link to="/forgot-password" className="text-xs text-cyan-400 hover:text-cyan-300 transition-colors">
+                                ¿Olvidaste tu contraseña?
+                            </Link>
+                        </div>
+
+                        <button
+                            type="submit"
                             disabled={loading}
                             className="w-full flex items-center justify-center gap-2 py-3 mt-2 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl text-white font-medium shadow-lg shadow-blue-500/30 transition-all focus:outline-none focus:ring-2 focus:ring-cyan-500"
                         >
