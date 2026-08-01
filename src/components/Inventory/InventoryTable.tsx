@@ -20,6 +20,7 @@ export default function InventoryTable({ products, isLoading, onRefresh, onEdit 
   const navigate = useNavigate();
   const canViewFinancials = hasPermission("reports.view");
   const canManageInventory = hasPermission("inventory.manage") || user?.role === "ADMIN";
+  const canEditProduct = canManageInventory || user?.role === "CAJERO";
   const [page, setPage] = useState(1);
 
   const goToLabels = (p: ProductRow) => {
@@ -107,7 +108,7 @@ export default function InventoryTable({ products, isLoading, onRefresh, onEdit 
                     >
                       <Printer size={16} />
                     </button>
-                    {canManageInventory && (
+                    {canEditProduct && (
                       <button
                          onClick={() => onEdit?.(p)}
                          className="p-2 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 rounded-lg transition-all"
@@ -156,7 +157,7 @@ export default function InventoryTable({ products, isLoading, onRefresh, onEdit 
                             </div>
                         </div>
                         <div className="flex gap-2">
-                          {canManageInventory && (
+                          {canEditProduct && (
                             <button
                                 onClick={() => onEdit?.(p)}
                                 className="p-3 bg-blue-500/10 text-blue-400 rounded-xl"
