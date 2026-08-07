@@ -102,6 +102,15 @@ export default function PurchasesPage() {
     const [variantEntries, setVariantEntries] = useState<VariantEntry[]>([]);
     const [loadingVariants, setLoadingVariants] = useState(false);
 
+    // Nueva variante inline
+    interface ProductAttribute { id: string; name: string; values: { id: string; value: string }[] }
+    const [productAttributes, setProductAttributes] = useState<ProductAttribute[]>([]);
+    const [showNewVariantForm, setShowNewVariantForm] = useState(false);
+    const [newVariantAttrs, setNewVariantAttrs] = useState<Record<string, string>>({});
+    const [newVariantSku, setNewVariantSku] = useState("");
+    const [newVariantSalePrice, setNewVariantSalePrice] = useState("");
+    const [savingNewVariant, setSavingNewVariant] = useState(false);
+
     // ── Purchase items ─────────────────────────────────────────────────────────
     const [items, setItems] = useState<PurchaseItem[]>([]);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -276,12 +285,20 @@ export default function PurchasesPage() {
 
         if (product.has_variants) {
             setLoadingVariants(true);
+            setShowNewVariantForm(false);
+            setNewVariantAttrs({});
+            setNewVariantSku("");
+            setNewVariantSalePrice(String(product.sale_price ?? 0));
             try {
-                const res = await api.get(`/products/${product.id}/variants`);
-                const loaded: VariantOption[] = res.data.map((v: any) => ({
+                const [varRes, attrRes] = await Promise.all([
+                    api.get(`/products/${product.id}/variants`),
+                    api.get(`/products/${product.id}/attributes`),
+                ]);
+                const loaded: VariantOption[] = varRes.data.map((v: any) => ({
                     ...v,
                     stockCount: (v.stock ?? []).reduce((sum: number, s: any) => sum + Number(s.quantity), 0),
                 }));
+                setProductAttributes(attrRes.data ?? []);
                 setVariantPickerProduct({ ...product, variants: loaded });
                 setVariantEntries(loaded.map(v => {
                     const snap = purchaseStocks?.find(s => s.sku === v.sku);
@@ -317,6 +334,59 @@ export default function PurchasesPage() {
 
     const updateEntry = (idx: number, field: keyof VariantEntry, value: string) => {
         setVariantEntries(prev => prev.map((e, i) => i === idx ? { ...e, [field]: value } : e));
+    };
+
+    const handleCreateVariant = async () => {
+        if (!variantPickerProduct) return;
+        const missing = productAttributes.filter(a => !newVariantAttrs[a.id]?.trim());
+        if (missing.length > 0) { toast.warning(`Completa el campo: ${missing.map(a => a.name).join(", ")}`); return; }
+        if (!newVariantSku.trim()) { toast.warning("El SKU es requerido"); return; }
+        if (!newVariantSalePrice || Number(newVariantSalePrice) <= 0) { toast.warning("El precio de venta es requerido"); return; }
+
+        setSavingNewVariant(true);
+        try {
+            const attrValueIds: string[] = [];
+            for (const attr of productAttributes) {
+                const typed = newVariantAttrs[attr.id].trim();
+                const existing = attr.values.find(v => v.value.toLowerCase() === typed.toLowerCase());
+                if (existing) {
+                    attrValueIds.push(existing.id);
+                } else {
+                    const res = await api.post(`/products/${variantPickerProduct.id}/attributes/${attr.id}/values`, { value: typed });
+                    attrValueIds.push(res.data.id);
+                    setProductAttributes(prev => prev.map(a => a.id === attr.id
+                        ? { ...a, values: [...a.values, { id: res.data.id, value: typed }] }
+                        : a
+                    ));
+                }
+            }
+            const varRes = await api.post(`/products/${variantPickerProduct.id}/variants`, {
+                sku: newVariantSku.trim(),
+                sale_price: Number(newVariantSalePrice),
+                attribute_value_ids: attrValueIds,
+                stock: 0,
+            });
+            const newV = varRes.data;
+            const label = productAttributes.map(a => `${a.name}: ${newVariantAttrs[a.id]}`).join(" / ");
+            const newEntry: VariantEntry = {
+                variantId: newV.id,
+                label,
+                sku: newV.sku,
+                quantity: "",
+                cost: String(variantPickerProduct.cost_price ?? 0),
+                salePrice: newVariantSalePrice,
+                stockCount: 0,
+            };
+            setVariantEntries(prev => [...prev, newEntry]);
+            setShowNewVariantForm(false);
+            setNewVariantAttrs({});
+            setNewVariantSku("");
+            toast.success("Variante creada");
+        } catch (err: any) {
+            toast.error(err?.response?.data?.message ?? "Error al crear la variante");
+        } finally {
+            setSavingNewVariant(false);
+        }
     };
 
     const confirmVariantEntries = () => {
@@ -651,6 +721,73 @@ export default function PurchasesPage() {
                                 </div>
                             )}
                         </div>
+
+                        {/* Nueva variante */}
+                        {productAttributes.length > 0 && (
+                            <div className="px-6 pb-4">
+                                {!showNewVariantForm ? (
+                                    <button
+                                        onClick={() => setShowNewVariantForm(true)}
+                                        className="w-full py-2 rounded-xl border border-dashed border-violet-500/40 text-violet-400 text-xs font-medium hover:bg-violet-500/10 transition-all flex items-center justify-center gap-1.5"
+                                    >
+                                        <Plus size={13} /> Nueva variante
+                                    </button>
+                                ) : (
+                                    <div className="bg-app-bg border border-violet-500/30 rounded-xl p-4 space-y-3">
+                                        <p className="text-xs font-bold text-violet-300 uppercase tracking-wide">Nueva variante</p>
+                                        {productAttributes.map(attr => (
+                                            <div key={attr.id}>
+                                                <label className="text-[10px] font-bold text-app-text-muted uppercase tracking-widest mb-1 block">{attr.name}</label>
+                                                <input
+                                                    list={`attr-list-${attr.id}`}
+                                                    value={newVariantAttrs[attr.id] ?? ""}
+                                                    onChange={e => setNewVariantAttrs(prev => ({ ...prev, [attr.id]: e.target.value }))}
+                                                    placeholder={`Ej: ${attr.values[0]?.value ?? attr.name}`}
+                                                    className="w-full bg-app-card border border-app-border rounded-lg px-3 py-2 text-sm text-app-text focus:outline-none focus:ring-1 focus:ring-violet-500/40"
+                                                />
+                                                <datalist id={`attr-list-${attr.id}`}>
+                                                    {attr.values.map(v => <option key={v.id} value={v.value} />)}
+                                                </datalist>
+                                            </div>
+                                        ))}
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <div>
+                                                <label className="text-[10px] font-bold text-app-text-muted uppercase tracking-widest mb-1 block">SKU</label>
+                                                <input
+                                                    value={newVariantSku}
+                                                    onChange={e => setNewVariantSku(e.target.value)}
+                                                    placeholder="SKU único"
+                                                    className="w-full bg-app-card border border-app-border rounded-lg px-3 py-2 text-sm text-app-text font-mono focus:outline-none focus:ring-1 focus:ring-violet-500/40"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] font-bold text-app-text-muted uppercase tracking-widest mb-1 block">P. Venta</label>
+                                                <input
+                                                    type="number" min="0"
+                                                    value={newVariantSalePrice}
+                                                    onChange={e => setNewVariantSalePrice(e.target.value)}
+                                                    className="w-full bg-app-card border border-emerald-500/20 rounded-lg px-3 py-2 text-sm text-emerald-400 font-bold focus:outline-none focus:ring-1 focus:ring-emerald-500/40"
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="flex gap-2 pt-1">
+                                            <button
+                                                onClick={() => setShowNewVariantForm(false)}
+                                                className="px-4 py-2 rounded-lg text-xs text-app-text-muted border border-app-border hover:text-app-text transition-all"
+                                            >Cancelar</button>
+                                            <button
+                                                onClick={handleCreateVariant}
+                                                disabled={savingNewVariant}
+                                                className="flex-1 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold transition-all flex items-center justify-center gap-1.5 disabled:opacity-50"
+                                            >
+                                                {savingNewVariant ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
+                                                Crear variante
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
 
                         {/* Footer */}
                         <div className="flex gap-3 px-6 py-4 border-t border-app-border">
