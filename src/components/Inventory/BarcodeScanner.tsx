@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { Html5Qrcode } from "html5-qrcode";
 import { X, Camera, RefreshCw } from "lucide-react";
 
 interface BarcodeScannerProps {
@@ -6,72 +7,52 @@ interface BarcodeScannerProps {
   onClose: () => void;
 }
 
+const SCANNER_ID = "barcode-scanner-viewport";
+
 export default function BarcodeScanner({ onDetected, onClose }: BarcodeScannerProps) {
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const rafRef = useRef<number>(0);
-  const [cameras, setCameras] = useState<MediaDeviceInfo[]>([]);
+  const scannerRef = useRef<Html5Qrcode | null>(null);
+  const [cameras, setCameras] = useState<{ id: string; label: string }[]>([]);
   const [selectedCamera, setSelectedCamera] = useState<string>("");
   const [error, setError] = useState("");
   const [ready, setReady] = useState(false);
-  const supported = "BarcodeDetector" in window;
 
-  // Listar cámaras disponibles
+  // Listar cámaras
   useEffect(() => {
-    if (!supported) {
-      setError("Tu navegador no soporta escaneo nativo. Usa Chrome en Android o Edge.");
-      return;
-    }
-    navigator.mediaDevices.enumerateDevices()
+    Html5Qrcode.getCameras()
       .then(devices => {
-        const videoDevices = devices.filter(d => d.kind === "videoinput");
-        setCameras(videoDevices);
-        const back = videoDevices.find(d => /back|rear|environment/i.test(d.label));
-        setSelectedCamera(back?.deviceId ?? videoDevices[0]?.deviceId ?? "");
+        if (!devices.length) { setError("No se encontraron cámaras."); return; }
+        setCameras(devices);
+        // Preferir cámara trasera
+        const back = devices.find(d => /back|rear|environment/i.test(d.label));
+        setSelectedCamera(back?.id ?? devices[0].id);
       })
-      .catch(() => setError("No se pudo listar las cámaras."));
+      .catch(() => setError("No se pudo acceder a la cámara. Verifica los permisos."));
   }, []);
 
-  // Iniciar stream y escaneo
+  // Iniciar escáner cuando se elige cámara
   useEffect(() => {
-    if (!selectedCamera || !videoRef.current || !supported) return;
-    let stopped = false;
+    if (!selectedCamera) return;
+
+    let scanner: Html5Qrcode;
 
     const start = async () => {
       try {
-        // Detener stream anterior
-        streamRef.current?.getTracks().forEach(t => t.stop());
+        // Detener instancia anterior si existe
+        if (scannerRef.current) {
+          try { await scannerRef.current.stop(); } catch { /* ya estaba detenida */ }
+        }
 
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { deviceId: { exact: selectedCamera } },
-        });
-        streamRef.current = stream;
-        if (!videoRef.current) return;
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
+        scanner = new Html5Qrcode(SCANNER_ID);
+        scannerRef.current = scanner;
+
+        await scanner.start(
+          { deviceId: { exact: selectedCamera } },
+          { fps: 10, qrbox: { width: 220, height: 140 }, aspectRatio: 1.333 },
+          (decodedText) => { onDetected(decodedText); },
+          () => { /* error por frame — ignorar */ }
+        );
         setReady(true);
-
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const detector = new (window as any).BarcodeDetector({
-          formats: ["ean_13", "ean_8", "code_128", "code_39", "code_93", "qr_code", "upc_a", "upc_e", "itf"],
-        });
-
-        const scan = async () => {
-          if (stopped || !videoRef.current) return;
-          try {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const barcodes: any[] = await detector.detect(videoRef.current);
-            if (barcodes.length > 0) {
-              onDetected(barcodes[0].rawValue as string);
-              return;
-            }
-          } catch {
-            // frame no listo aún — continuar
-          }
-          rafRef.current = requestAnimationFrame(scan);
-        };
-
-        rafRef.current = requestAnimationFrame(scan);
+        setError("");
       } catch {
         setError("No se pudo iniciar la cámara. Verifica los permisos del navegador.");
       }
@@ -80,17 +61,18 @@ export default function BarcodeScanner({ onDetected, onClose }: BarcodeScannerPr
     start();
 
     return () => {
-      stopped = true;
-      cancelAnimationFrame(rafRef.current);
-      streamRef.current?.getTracks().forEach(t => t.stop());
+      if (scannerRef.current) {
+        scannerRef.current.stop().catch(() => {});
+        scannerRef.current = null;
+      }
       setReady(false);
     };
   }, [selectedCamera]);
 
   const switchCamera = () => {
-    const idx = cameras.findIndex(c => c.deviceId === selectedCamera);
+    const idx = cameras.findIndex(c => c.id === selectedCamera);
     const next = cameras[(idx + 1) % cameras.length];
-    if (next) setSelectedCamera(next.deviceId);
+    if (next) setSelectedCamera(next.id);
   };
 
   return (
@@ -108,41 +90,26 @@ export default function BarcodeScanner({ onDetected, onClose }: BarcodeScannerPr
           </button>
         </div>
 
-        {/* Visor */}
-        <div className="relative bg-black" style={{ aspectRatio: "4/3" }}>
-          <video ref={videoRef} className="w-full h-full object-cover" playsInline muted />
+        {/* Visor — html5-qrcode renderiza aquí */}
+        <div className="relative bg-black" style={{ minHeight: 240 }}>
+          <div id={SCANNER_ID} className="w-full" />
 
-          {/* Guía de escaneo */}
-          {ready && !error && (
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <div className="relative w-56 h-36">
-                <div className="absolute top-0 left-0 w-6 h-6 border-t-2 border-l-2 border-app-accent rounded-tl" />
-                <div className="absolute top-0 right-0 w-6 h-6 border-t-2 border-r-2 border-app-accent rounded-tr" />
-                <div className="absolute bottom-0 left-0 w-6 h-6 border-b-2 border-l-2 border-app-accent rounded-bl" />
-                <div className="absolute bottom-0 right-0 w-6 h-6 border-b-2 border-r-2 border-app-accent rounded-br" />
-                <div className="absolute top-1/2 left-0 right-0 h-px bg-app-accent/70 animate-pulse" />
-              </div>
+          {!ready && !error && (
+            <div className="absolute inset-0 flex items-center justify-center bg-black">
+              <div className="w-6 h-6 border-2 border-app-accent border-t-transparent rounded-full animate-spin" />
             </div>
           )}
 
           {error && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black/70 p-6">
+            <div className="absolute inset-0 flex items-center justify-center bg-black/80 p-6">
               <p className="text-red-400 text-sm text-center">{error}</p>
-            </div>
-          )}
-
-          {!ready && !error && (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="w-6 h-6 border-2 border-app-accent border-t-transparent rounded-full animate-spin" />
             </div>
           )}
         </div>
 
         {/* Footer */}
         <div className="px-5 py-4 flex items-center justify-between gap-3">
-          <p className="text-xs text-app-text-muted">
-            {error ? "Solo funciona en Chrome / Edge" : "Apunta la cámara al código de barras"}
-          </p>
+          <p className="text-xs text-app-text-muted">Apunta la cámara al código de barras</p>
           {cameras.length > 1 && !error && (
             <button
               onClick={switchCamera}

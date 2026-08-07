@@ -10,7 +10,10 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@zxing/browser": "^0.2.1",
+    "@zxing/library": "^0.23.0",
     "axios": "^1.13.4",
+    "html5-qrcode": "^2.3.8",
     "jsbarcode": "^3.12.3",
     "jwt-decode": "^4.0.0",
     "lucide-react": "^0.563.0",
