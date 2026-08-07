@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import { BrowserMultiFormatReader } from "@zxing/browser";
-import type { Result, Exception } from "@zxing/library";
 import { X, Camera, RefreshCw } from "lucide-react";
 
 interface BarcodeScannerProps {
@@ -40,12 +39,8 @@ export default function BarcodeScanner({ onDetected, onClose }: BarcodeScannerPr
     setScanning(true);
     setError("");
 
-    reader.decodeFromVideoDevice(selectedCamera, videoRef.current, (result: Result | undefined, err: Exception | undefined) => {
-      if (result) {
-        onDetected(result.getText());
-      }
-      // err de tipo NotFoundException es normal mientras no hay código — se ignora
-      void err;
+    reader.decodeFromVideoDevice(selectedCamera, videoRef.current, (result, _err) => {
+      if (result) onDetected(result.getText());
     }).catch(() => {
       setError("No se pudo iniciar la cámara. Verifica los permisos.");
       setScanning(false);
