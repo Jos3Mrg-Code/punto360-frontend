@@ -24,6 +24,8 @@ export interface ProductRow {
   is_consignment?: boolean;
   has_variants?: boolean;
   barcode?: string | null;
+  variantSkus?: string[];
+  variantBarcodes?: string[];
 }
 
 export default function InventoryPage() {
@@ -84,6 +86,8 @@ export default function InventoryPage() {
                   is_consignment: p.is_consignment ?? false,
                   has_variants: p.has_variants ?? false,
                   barcode: p.barcode ?? null,
+                  variantSkus: (p.product_variants ?? []).map((v: any) => v.sku).filter(Boolean),
+                  variantBarcodes: (p.product_variants ?? []).map((v: any) => v.barcode).filter(Boolean),
                 };
             });
             setAllProducts(mapped);
@@ -112,8 +116,13 @@ export default function InventoryPage() {
         if (filterType === "low") matchesFilter = (p.stockCount > 0 && p.stockCount <= 5);
         if (filterType === "out") matchesFilter = (p.stockCount === 0);
 
+        const q = searchQuery.toLowerCase();
         const matchesSearch = searchQuery
-            ? p.name.toLowerCase().includes(searchQuery.toLowerCase()) || p.sku.toLowerCase().includes(searchQuery.toLowerCase())
+            ? p.name.toLowerCase().includes(q)
+              || p.sku.toLowerCase().includes(q)
+              || (p.barcode ?? "").toLowerCase().includes(q)
+              || (p.variantSkus ?? []).some(s => s.toLowerCase().includes(q))
+              || (p.variantBarcodes ?? []).some(b => b.toLowerCase().includes(q))
             : true;
 
         const matchesCategory = filterCategory ? p.category_name === filterCategory : true;
