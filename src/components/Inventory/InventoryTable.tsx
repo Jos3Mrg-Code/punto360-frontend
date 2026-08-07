@@ -20,7 +20,7 @@ export default function InventoryTable({ products, isLoading, onRefresh, onEdit 
   const navigate = useNavigate();
   const canViewFinancials = hasPermission("reports.view");
   const canManageInventory = hasPermission("inventory.manage") || user?.role === "ADMIN";
-  const canEditProduct = canManageInventory || user?.role === "CAJERO";
+  const canEditProduct = canManageInventory;
   const [page, setPage] = useState(1);
 
   const goToLabels = (p: ProductRow) => {
