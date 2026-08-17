@@ -87,7 +87,7 @@ export default function SalesHistoryPage() {
     /** Reimprime una factura ya cobrada, usando los datos de la sucursal donde se vendió */
     const handleReprint = (sale: Sale) => {
         const header: ReceiptHeader = {
-            company_name: receiptInfo?.company_name ?? null,
+            company_name: receiptInfo?.company_name ?? user?.companyName ?? null,
             document_number: receiptInfo?.document_number ?? null,
             branch_name: sale.branches?.name ?? receiptInfo?.branch_name ?? null,
             address: sale.branches?.address ?? receiptInfo?.address ?? null,

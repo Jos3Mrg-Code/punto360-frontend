@@ -1081,7 +1081,16 @@ export default function PosPage() {
                   const d = printData;
                   setPrintData(null);
                   toast.success("¡Venta registrada con éxito!");
-                  const ok = printReceipt(receiptInfo, {
+                  // Si /companies/receipt-info no respondió, al menos el nombre
+                  // de la empresa se recupera del JWT
+                  const header: ReceiptHeader = {
+                    document_number: receiptInfo?.document_number ?? null,
+                    branch_name: receiptInfo?.branch_name ?? null,
+                    address: receiptInfo?.address ?? null,
+                    phone: receiptInfo?.phone ?? null,
+                    company_name: receiptInfo?.company_name ?? user?.companyName ?? null,
+                  };
+                  const ok = printReceipt(header, {
                     saleNumber: d.saleNumber,
                     date: d.date,
                     items: d.items.map(i => ({
