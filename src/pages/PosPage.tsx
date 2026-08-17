@@ -2,6 +2,7 @@ import { toast } from "../lib/toast";
 import { useEffect, useState, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import DashboardLayout from "../layouts/DashboardLayout";
+import { printReceipt, formatSaleNumber, getPaperWidth, PAPER_WIDTH_KEY, type ReceiptHeader } from "../lib/receipt";
 import { ShoppingCart, Search, CreditCard, Banknote, Building2, Plus, Minus, Trash2, CheckCircle2, Loader2, AlertTriangle, TrendingUp, Receipt, Wallet, UserCheck, X, Pause, Clock, Layers, ScanLine } from "lucide-react";
 import { api } from "../api/axios";
 import { useAuth } from "../auth/AuthContext";
@@ -95,9 +96,9 @@ export default function PosPage() {
   const [pendingSales, setPendingSales] = useState<any[]>([]);
   const [showPending, setShowPending] = useState(false);
   const [variantPrompt, setVariantPrompt] = useState<{ product: ProductRow; variants: VariantOption[] } | null>(null);
-  const [printData, setPrintData] = useState<{ items: CartItem[]; total: number; change: number; paymentMethod: string; customerName?: string } | null>(null);
-  const [paperWidth, setPaperWidth] = useState<number>(() => Number(localStorage.getItem('receipt_paper_width') || 80));
-  const [branchName, setBranchName] = useState<string>("");
+  const [printData, setPrintData] = useState<{ items: CartItem[]; total: number; change: number; cashReceived?: number; paymentMethod: string; customerName?: string; saleNumber: number | null; date: Date; saleType?: string } | null>(null);
+  const [paperWidth, setPaperWidth] = useState<number>(getPaperWidth);
+  const [receiptInfo, setReceiptInfo] = useState<ReceiptHeader | null>(null);
   const variantMap = useRef<Record<string, VariantMapEntry>>({});
 
   const fetchShiftStats = async () => {
@@ -174,13 +175,13 @@ export default function PosPage() {
     fetchProducts();
     fetchCustomers();
     api.get("/products/variant-map").then(res => { variantMap.current = res.data; }).catch(() => {});
+    api.get("/companies/receipt-info").then(res => setReceiptInfo(res.data)).catch(() => {});
     api.get("/cash-registers/current")
       .then(res => {
         setHasCashSession(!!res.data);
         if (res.data) {
           fetchShiftStats();
           fetchPendingSales();
-          if (res.data.branches?.name) setBranchName(res.data.branches.name);
         }
       })
       .catch(() => setHasCashSession(false));
@@ -434,13 +435,20 @@ export default function PosPage() {
       if (user?.saleTypeEnabled) {
         payload.saleType = saleType;
       }
-      await api.post("/sales", payload);
+      const res = await api.post("/sales", payload);
+      const received = parseFloat(cashReceived);
       setPrintData({
         items: [...cart],
         total: cartTotal,
         change,
+        cashReceived: isNaN(received) ? undefined : received,
         paymentMethod,
         customerName: selectedCustomer?.name,
+        // Consecutivo y fecha vienen del backend: la factura debe reflejar
+        // el momento de la venta, no el de la impresión
+        saleNumber: res.data?.sale_number ?? null,
+        date: res.data?.created_at ? new Date(res.data.created_at) : new Date(),
+        saleType: user?.saleTypeEnabled ? saleType : undefined,
       });
       setCart([]);
       setCashReceived("");
@@ -1027,8 +1035,23 @@ export default function PosPage() {
             </div>
             <div className="text-center">
               <h2 className="text-xl font-black text-app-text">¿Imprimir ticket?</h2>
+              {formatSaleNumber(printData.saleNumber) && (
+                <p className="text-[11px] font-mono font-black text-app-text-muted tracking-tighter mt-1">{formatSaleNumber(printData.saleNumber)}</p>
+              )}
               <p className="text-app-text-muted text-sm mt-1">Total: <span className="text-app-accent font-black">{cop(printData.total)}</span></p>
             </div>
+            {receiptInfo && (!receiptInfo.document_number || !receiptInfo.branch_name || !receiptInfo.address) && (
+              <div className="w-full flex items-start gap-2 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20">
+                <AlertTriangle size={16} className="text-amber-400 shrink-0 mt-0.5" />
+                <p className="text-[11px] text-amber-300/90 font-bold leading-snug">
+                  Faltan datos en la factura: {[
+                    !receiptInfo.document_number && "NIT",
+                    !receiptInfo.branch_name && "sucursal",
+                    !receiptInfo.address && "dirección",
+                  ].filter(Boolean).join(", ")}. Complétalos en Mi Cuenta.
+                </p>
+              </div>
+            )}
             <div className="flex items-center gap-2 w-full px-1">
               <label className="text-[10px] font-black text-app-text-muted uppercase tracking-widest whitespace-nowrap">Ancho papel</label>
               <div className="flex items-center gap-1 ml-auto">
@@ -1039,7 +1062,7 @@ export default function PosPage() {
                   onChange={(e) => {
                     const v = Number(e.target.value);
                     setPaperWidth(v);
-                    localStorage.setItem('receipt_paper_width', String(v));
+                    localStorage.setItem(PAPER_WIDTH_KEY, String(v));
                   }}
                   className="w-16 bg-app-bg border border-app-border rounded-lg px-2 py-1 text-xs text-app-accent font-black text-center focus:outline-none focus:border-app-accent/50"
                 />
@@ -1058,40 +1081,26 @@ export default function PosPage() {
                   const d = printData;
                   setPrintData(null);
                   toast.success("¡Venta registrada con éxito!");
-                  const payLabel: Record<string, string> = { CASH: 'Efectivo', CARD: 'Tarjeta', TRANSFER: 'Transferencia', CREDIT: 'Crédito' };
-                  const pw = `${paperWidth}mm`;
-                  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Ticket</title><style>
-                    @page{size:${pw} auto;margin:0;}
-                    *{margin:0;padding:0;box-sizing:border-box;}
-                    body{font-family:'Courier New',monospace;font-size:12px;width:${pw};padding:3mm 2mm;}
-                    .center{text-align:center;}
-                    .bold{font-weight:bold;}
-                    .line{border-top:1px dashed #000;margin:5px 0;}
-                    .row{display:flex;justify-content:space-between;gap:4px;}.row span:last-child{white-space:nowrap;text-align:right;flex-shrink:0;}
-                    .total{font-size:14px;font-weight:bold;}
-                    .small{font-size:10px;}
-                    .logo{font-size:9px;text-align:center;margin-top:6px;opacity:0.5;}
-                  </style></head><body>
-                    <p class="center bold" style="font-size:15px;">${user?.companyName ?? 'Mi Tienda'}</p>
-                    ${branchName ? `<p class="center small">${branchName}</p>` : ''}
-                    <p class="center small">${new Date().toLocaleString('es-CO')}</p>
-                    ${user?.userName ? `<p class="center small">Atendido por: ${user.userName}</p>` : ''}
-                    <div class="line"></div>
-                    ${d.items.map(i => `
-                      <div class="bold" style="font-size:11px;">${i.product.name}${i.variantLabel ? ' <span style="font-weight:normal;font-size:10px;">('+i.variantLabel+')</span>' : ''}</div>
-                      <div class="row small"><span>${i.quantity} x $${i.customPrice.toLocaleString('es-CO')}</span><span>$${(i.quantity * i.customPrice).toLocaleString('es-CO')}</span></div>
-                    `).join('')}
-                    <div class="line"></div>
-                    <div class="row total"><span>TOTAL</span><span>$${d.total.toLocaleString('es-CO')}</span></div>
-                    <div class="row small"><span>Pago</span><span>${payLabel[d.paymentMethod] ?? d.paymentMethod}</span></div>
-                    ${d.paymentMethod === 'CASH' && d.change > 0 ? `<div class="row small"><span>Cambio</span><span>$${d.change.toLocaleString('es-CO')}</span></div>` : ''}
-                    ${d.customerName ? `<div class="row small"><span>Cliente</span><span>${d.customerName}</span></div>` : ''}
-                    <div class="line"></div>
-                    <p class="center small">¡Gracias por su compra!</p>
-                    <p class="logo">— PUNTO360 —</p>
-                  </body></html>`;
-                  const win = window.open('', '_blank', `width=${paperWidth * 4},height=700`);
-                  if (win) { win.document.write(html); win.document.close(); win.focus(); win.print(); win.onafterprint = () => win.close(); }
+                  const ok = printReceipt(receiptInfo, {
+                    saleNumber: d.saleNumber,
+                    date: d.date,
+                    items: d.items.map(i => ({
+                      name: i.product.name,
+                      variantLabel: i.variantLabel,
+                      quantity: i.quantity,
+                      price: i.customPrice,
+                    })),
+                    total: d.total,
+                    paymentMethod: d.paymentMethod,
+                    change: d.change,
+                    cashReceived: d.cashReceived,
+                    customerName: d.customerName,
+                    cashierName: user?.userName,
+                    saleType: d.saleType,
+                  }, paperWidth);
+                  if (!ok) {
+                    toast.warning("El navegador bloqueó la ventana de impresión. Puedes reimprimir desde Historial.");
+                  }
                 }}
                 className="flex-1 py-3 rounded-xl bg-app-accent hover:bg-app-accent-hover text-white font-black text-[11px] uppercase tracking-widest transition-all shadow-lg shadow-app-accent/20"
               >

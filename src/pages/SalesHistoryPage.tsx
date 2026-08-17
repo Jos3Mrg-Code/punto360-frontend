@@ -1,9 +1,10 @@
 import { toast } from "../lib/toast";
 import React, { useEffect, useState, useMemo } from "react";
 import DashboardLayout from "../layouts/DashboardLayout";
-import { History, Search, ChevronDown, ChevronUp, AlertOctagon, CheckCircle2, RotateCcw } from "lucide-react";
+import { History, Search, ChevronDown, ChevronUp, AlertOctagon, CheckCircle2, RotateCcw, Printer } from "lucide-react";
 import { api } from "../api/axios";
 import { useAuth } from "../auth/AuthContext";
+import { printReceipt, formatSaleNumber, getPaperWidth, type ReceiptHeader } from "../lib/receipt";
 
 const cop = (v: number) => new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", minimumFractionDigits: 0 }).format(v);
 
@@ -19,17 +20,23 @@ interface SaleItem {
         unit_type: "UNIT" | "WEIGHT";
         categories?: { id: string; name: string } | null;
     };
+    variants?: {
+        sku: string;
+        values: { attribute_value: { value: string; attribute: { name: string } } }[];
+    } | null;
 }
 
 interface Sale {
     id: string;
+    sale_number?: number | null;
     created_at: string;
     total: number;
     payment_method: string;
     status: string;
     sale_type?: string;
     sale_items: SaleItem[];
-    branches: { name: string };
+    branches: { name: string; address?: string | null; phone?: string | null };
+    customers?: { name: string } | null;
 }
 
 export default function SalesHistoryPage() {
@@ -47,6 +54,7 @@ export default function SalesHistoryPage() {
     const [isLoading, setIsLoading] = useState(false);
     const [fetchError, setFetchError] = useState(false);
     const [expandedId, setExpandedId] = useState<string | null>(null);
+    const [receiptInfo, setReceiptInfo] = useState<ReceiptHeader | null>(null);
 
     const fetchSales = async () => {
         setIsLoading(true);
@@ -69,10 +77,43 @@ export default function SalesHistoryPage() {
 
     useEffect(() => {
         fetchSales();
+        api.get("/companies/receipt-info").then(res => setReceiptInfo(res.data)).catch(() => {});
     }, []);
 
     const toggleExpand = (id: string) => {
         setExpandedId(expandedId === id ? null : id);
+    };
+
+    /** Reimprime una factura ya cobrada, usando los datos de la sucursal donde se vendió */
+    const handleReprint = (sale: Sale) => {
+        const header: ReceiptHeader = {
+            company_name: receiptInfo?.company_name ?? null,
+            document_number: receiptInfo?.document_number ?? null,
+            branch_name: sale.branches?.name ?? receiptInfo?.branch_name ?? null,
+            address: sale.branches?.address ?? receiptInfo?.address ?? null,
+            phone: sale.branches?.phone ?? receiptInfo?.phone ?? null,
+        };
+
+        const ok = printReceipt(header, {
+            saleNumber: sale.sale_number ?? null,
+            date: new Date(sale.created_at),
+            items: sale.sale_items.map(i => ({
+                name: i.products?.name ?? "Producto",
+                variantLabel: i.variants
+                    ? i.variants.values.map(v => `${v.attribute_value.attribute.name}: ${v.attribute_value.value}`).join(" / ")
+                    : undefined,
+                quantity: Number(i.quantity),
+                price: Number(i.price),
+            })),
+            total: Number(sale.total),
+            paymentMethod: sale.payment_method,
+            customerName: sale.customers?.name,
+            saleType: user?.saleTypeEnabled ? sale.sale_type : undefined,
+            isReprint: true,
+            isCancelled: sale.status === 'CANCELLED',
+        }, getPaperWidth());
+
+        if (!ok) toast.warning("El navegador bloqueó la ventana de impresión. Permite las ventanas emergentes de este sitio.");
     };
 
     const allCategories = useMemo(() => {
@@ -287,7 +328,9 @@ export default function SalesHistoryPage() {
                                             </td>
                                             <td className="px-6 py-4">
                                                 <div className="flex flex-col">
-                                                    <span className="font-mono text-app-accent text-xs font-black">#{sale.id.split('-')[0].toUpperCase()}</span>
+                                                    <span className="font-mono text-app-accent text-xs font-black">
+                                                        {formatSaleNumber(sale.sale_number) ?? `#${sale.id.split('-')[0].toUpperCase()}`}
+                                                    </span>
                                                     <span className="text-[9px] text-app-text-muted font-black uppercase tracking-widest">{totalItems} productos</span>
                                                 </div>
                                             </td>
@@ -340,16 +383,22 @@ export default function SalesHistoryPage() {
                                                                     </div>
                                                                 ))}
                                                             </div>
-                                                            {!isCancelled && (
-                                                                <div className="mt-4 pt-4 border-t border-app-border flex justify-end">
-                                                                    <button 
+                                                            <div className="mt-4 pt-4 border-t border-app-border flex justify-end gap-3">
+                                                                <button
+                                                                    onClick={() => handleReprint(sale)}
+                                                                    className="px-5 py-3 bg-app-accent/10 text-app-accent border border-app-accent/20 font-black text-[10px] uppercase tracking-widest rounded-xl flex items-center gap-2 hover:bg-app-accent/20 transition-all active:scale-95"
+                                                                >
+                                                                    <Printer size={14} /> Reimprimir
+                                                                </button>
+                                                                {!isCancelled && (
+                                                                    <button
                                                                         onClick={() => handleCancelSale(sale.id)}
                                                                         className="px-5 py-3 bg-rose-500 text-white font-black text-[10px] uppercase tracking-widest rounded-xl flex items-center gap-2 hover:bg-rose-600 transition-all shadow-xl shadow-rose-500/20 active:scale-95"
                                                                     >
                                                                         <RotateCcw size={14} /> Anular Registro
                                                                     </button>
-                                                                </div>
-                                                            )}
+                                                                )}
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 </td>
@@ -375,7 +424,9 @@ export default function SalesHistoryPage() {
                             <div key={sale.id} className={`p-4 transition-colors ${isCancelled ? 'opacity-40 grayscale' : ''}`}>
                                 <div className="flex justify-between items-start mb-3">
                                     <div className="flex flex-col">
-                                        <span className="font-mono text-app-accent text-xs font-black">#{sale.id.split('-')[0].toUpperCase()}</span>
+                                        <span className="font-mono text-app-accent text-xs font-black">
+                                            {formatSaleNumber(sale.sale_number) ?? `#${sale.id.split('-')[0].toUpperCase()}`}
+                                        </span>
                                         <span className="text-[10px] font-black text-app-text mt-1">{new Date(sale.created_at).toLocaleDateString()} · {new Date(sale.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                                     </div>
                                     <div className="flex flex-col items-end">
@@ -423,10 +474,16 @@ export default function SalesHistoryPage() {
                                                 </div>
                                             ))}
                                         </div>
+                                        <button
+                                            onClick={() => handleReprint(sale)}
+                                            className="w-full mt-5 py-3 bg-app-accent/10 text-app-accent border border-app-accent/20 font-black text-[9px] uppercase tracking-widest rounded-xl flex items-center justify-center gap-2 hover:bg-app-accent/20 transition-all active:scale-95"
+                                        >
+                                            <Printer size={13} /> Reimprimir Factura
+                                        </button>
                                         {!isCancelled && (
-                                            <button 
+                                            <button
                                                 onClick={() => handleCancelSale(sale.id)}
-                                                className="w-full mt-5 py-3 bg-rose-500 text-white font-black text-[9px] uppercase tracking-widest rounded-xl hover:bg-rose-600 transition-all shadow-lg active:scale-95"
+                                                className="w-full mt-3 py-3 bg-rose-500 text-white font-black text-[9px] uppercase tracking-widest rounded-xl hover:bg-rose-600 transition-all shadow-lg active:scale-95"
                                             >
                                                 Anular Venta
                                             </button>
