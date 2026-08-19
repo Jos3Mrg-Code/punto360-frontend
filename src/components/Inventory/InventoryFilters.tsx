@@ -7,8 +7,8 @@ const BarcodeScanner = lazy(() => import("./BarcodeScanner"));
 interface InventoryFiltersProps {
     searchQuery: string;
     setSearchQuery: (val: string) => void;
-    filterType: "all" | "low" | "out";
-    setFilterType: (val: "all" | "low" | "out") => void;
+    filterType: "all" | "low" | "out" | "published" | "unpublished";
+    setFilterType: (val: "all" | "low" | "out" | "published" | "unpublished") => void;
     filterCategory: string;
     setFilterCategory: (val: string) => void;
     categories: string[];
@@ -64,6 +64,16 @@ export default function InventoryFilters({ searchQuery, setSearchQuery, filterTy
                             onClick={() => setFilterType("out")}
                             className={`flex-1 px-3 py-2 text-[10px] font-black uppercase tracking-tighter rounded-lg transition-all ${filterType === "out" ? "bg-rose-500 text-white shadow-lg" : "text-app-text-muted hover:bg-rose-500/5"}`}>
                             Agotados
+                        </button>
+                        <button
+                            onClick={() => setFilterType("published")}
+                            className={`flex-1 px-3 py-2 text-[10px] font-black uppercase tracking-tighter rounded-lg transition-all ${filterType === "published" ? "bg-cyan-500 text-white shadow-lg" : "text-app-text-muted hover:bg-cyan-500/5"}`}>
+                            En web
+                        </button>
+                        <button
+                            onClick={() => setFilterType("unpublished")}
+                            className={`flex-1 px-3 py-2 text-[10px] font-black uppercase tracking-tighter rounded-lg transition-all ${filterType === "unpublished" ? "bg-slate-500 text-white shadow-lg" : "text-app-text-muted hover:bg-slate-500/5"}`}>
+                            Sin publicar
                         </button>
                     </div>
 

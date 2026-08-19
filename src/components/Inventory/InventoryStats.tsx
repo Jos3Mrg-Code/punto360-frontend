@@ -4,12 +4,13 @@ import { useAuth } from "../../auth/AuthContext";
 
 interface InventoryStatsProps {
     total: number;
+    published: number;
     lowStock: number;
     outOfStock: number;
     valorizado: ProductRow[];
 }
 
-export default function InventoryStats({ total, lowStock, outOfStock, valorizado }: InventoryStatsProps) {
+export default function InventoryStats({ total, published, lowStock, outOfStock, valorizado }: InventoryStatsProps) {
     const { hasPermission } = useAuth();
     const canViewFinancials = hasPermission("reports.view");
     const totalValue = valorizado.reduce((acc, p) => acc + (p.cost_price * p.stockCount), 0);
@@ -29,6 +30,7 @@ export default function InventoryStats({ total, lowStock, outOfStock, valorizado
                     </div>
                     <p className="text-[10px] font-black text-app-text-muted uppercase tracking-widest leading-none mb-1 opacity-70">Total Productos</p>
                     <h3 className="text-2xl md:text-3xl font-black text-app-text tracking-tight">{total}</h3>
+                    <p className="text-[9px] font-black text-cyan-400/80 uppercase tracking-widest mt-1.5">{published} publicados en web</p>
                 </div>
                 <div className="absolute -right-4 -bottom-4 text-cyan-500/5 rotate-12 group-hover:scale-110 group-hover:rotate-0 transition-all duration-500">
                     <Layers size={100} />

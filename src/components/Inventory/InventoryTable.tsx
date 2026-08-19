@@ -1,4 +1,4 @@
-import { Edit2, PackageSearch, Power, PowerOff, Printer, ChevronLeft, ChevronRight } from "lucide-react";
+import { Edit2, PackageSearch, Power, PowerOff, Printer, ChevronLeft, ChevronRight, Globe, GlobeLock } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "../../lib/toast";
@@ -11,11 +11,13 @@ interface InventoryTableProps {
   isLoading: boolean;
   onRefresh: () => void;
   onEdit?: (product: ProductRow) => void;
+  selectedIds?: string[];
+  setSelectedIds?: (ids: string[]) => void;
 }
 
 const PAGE_SIZE = 20;
 
-export default function InventoryTable({ products, isLoading, onRefresh, onEdit }: InventoryTableProps) {
+export default function InventoryTable({ products, isLoading, onRefresh, onEdit, selectedIds = [], setSelectedIds }: InventoryTableProps) {
   const { hasPermission, user } = useAuth();
   const navigate = useNavigate();
   const canViewFinancials = hasPermission("reports.view");
@@ -31,6 +33,43 @@ export default function InventoryTable({ products, isLoading, onRefresh, onEdit 
   const paginated = products.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   useEffect(() => { setPage(1); }, [products.length]);
+
+  const toggleOne = (id: string) => {
+    if (!setSelectedIds) return;
+    setSelectedIds(selectedIds.includes(id) ? selectedIds.filter((x: string) => x !== id) : [...selectedIds, id]);
+  };
+
+  // Selecciona solo lo visible en la página: marcar 800 productos de golpe
+  // casi nunca es lo que se quiere
+  const pageIds = paginated.map(p => p.id);
+  const allPageSelected = pageIds.length > 0 && pageIds.every(id => selectedIds.includes(id));
+  const togglePage = () => {
+    if (!setSelectedIds) return;
+    setSelectedIds(allPageSelected
+      ? selectedIds.filter((id: string) => !pageIds.includes(id))
+      : [...new Set([...selectedIds, ...pageIds])]);
+  };
+
+  const handleTogglePublish = async (p: ProductRow) => {
+    try {
+      await api.patch(`/products/${p.id}/publish`, { is_published: !p.is_published });
+      toast.success(p.is_published ? "Retirado de la web" : "Publicado en la web");
+      onRefresh();
+    } catch {
+      toast.error("No se pudo cambiar la publicación");
+    }
+  };
+
+  const handleBulkPublish = async (isPublished: boolean) => {
+    try {
+      const res = await api.patch("/products/publish-bulk", { ids: selectedIds, is_published: isPublished });
+      toast.success(`${res.data.updated} producto(s) ${isPublished ? "publicados" : "retirados"}`);
+      setSelectedIds?.([]);
+      onRefresh();
+    } catch {
+      toast.error("No se pudo actualizar la selección");
+    }
+  };
 
 
 
@@ -69,10 +108,49 @@ export default function InventoryTable({ products, isLoading, onRefresh, onEdit 
       <div className="bg-app-card backdrop-blur-md border border-app-border rounded-2xl shadow-xl overflow-hidden min-w-0">
         
         {/* VISTA DESKTOP: TABLA */}
+      {canManageInventory && selectedIds.length > 0 && (
+        <div className="flex flex-wrap items-center gap-3 px-6 py-3 bg-cyan-500/10 border-b border-cyan-500/20">
+          <span className="text-[11px] font-black text-cyan-400 uppercase tracking-widest">
+            {selectedIds.length} seleccionado{selectedIds.length !== 1 ? 's' : ''}
+          </span>
+          <div className="flex gap-2 ml-auto">
+            <button
+              onClick={() => handleBulkPublish(true)}
+              className="px-4 py-2 rounded-lg bg-cyan-500 text-white font-black text-[10px] uppercase tracking-widest flex items-center gap-2 hover:bg-cyan-600 transition-all active:scale-95"
+            >
+              <Globe size={13} /> Publicar en web
+            </button>
+            <button
+              onClick={() => handleBulkPublish(false)}
+              className="px-4 py-2 rounded-lg border border-app-border text-app-text-muted font-black text-[10px] uppercase tracking-widest flex items-center gap-2 hover:text-app-text transition-all active:scale-95"
+            >
+              <GlobeLock size={13} /> Retirar
+            </button>
+            <button
+              onClick={() => setSelectedIds?.([])}
+              className="px-3 py-2 rounded-lg text-app-text-muted font-black text-[10px] uppercase tracking-widest hover:text-app-text transition-all"
+            >
+              Limpiar
+            </button>
+          </div>
+        </div>
+      )}
+
         <div className="hidden md:block overflow-x-auto w-full">
           <table className="w-full text-sm text-left">
             <thead className="bg-app-accent/5 text-app-text-muted border-b border-app-border">
               <tr>
+                {canManageInventory && (
+                  <th className="pl-6 pr-2 py-4 w-10">
+                    <input
+                      type="checkbox"
+                      checked={allPageSelected}
+                      onChange={togglePage}
+                      className="w-4 h-4 accent-cyan-500 cursor-pointer"
+                      title="Seleccionar los de esta pagina"
+                    />
+                  </th>
+                )}
                 <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest">SKU</th>
                 <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest">Producto</th>
                 {canViewFinancials && <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest">Precio</th>}
@@ -88,6 +166,16 @@ export default function InventoryTable({ products, isLoading, onRefresh, onEdit 
                   key={p.id}
                   className={`transition-all group ${!p.is_active ? 'bg-app-bg opacity-50' : p.stockCount === 0 ? 'bg-rose-500/5 hover:bg-rose-500/10' : 'hover:bg-app-accent/5'}`}
                 >
+                  {canManageInventory && (
+                    <td className="pl-6 pr-2 py-4">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.includes(p.id)}
+                        onChange={() => toggleOne(p.id)}
+                        className="w-4 h-4 accent-cyan-500 cursor-pointer"
+                      />
+                    </td>
+                  )}
                   <td className="px-6 py-4 font-mono text-app-accent font-black tracking-tighter">{p.sku}</td>
                   <td className="px-6 py-4 font-black text-xs uppercase tracking-tight">{p.name}</td>
                   {canViewFinancials && <td className="px-6 py-4 font-black">${Number(p.sale_price).toLocaleString()}</td>}
@@ -117,6 +205,13 @@ export default function InventoryTable({ products, isLoading, onRefresh, onEdit 
                         <Edit2 size={16} />
                       </button>
                     )}
+                    {canManageInventory && <button
+                       onClick={() => handleTogglePublish(p)}
+                       className={`p-2 rounded-lg transition-all ${p.is_published ? 'bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20' : 'bg-app-bg text-app-text-muted hover:text-app-text'}`}
+                       title={p.is_published ? "Publicado en la web - clic para retirar" : "No publicado - clic para publicar en la web"}
+                    >
+                      {p.is_published ? <Globe size={16} /> : <GlobeLock size={16} />}
+                    </button>}
                     {canManageInventory && <button
                        onClick={() => handleToggleStatus(p.id, p.is_active)}
                        className={`p-2 rounded-lg transition-all ${p.is_active ? 'bg-rose-500/10 text-rose-400 hover:bg-rose-500/20' : 'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20'}`}

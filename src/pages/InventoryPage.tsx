@@ -23,6 +23,7 @@ export interface ProductRow {
   category_name?: string;
   is_consignment?: boolean;
   has_variants?: boolean;
+  is_published?: boolean;
   barcode?: string | null;
   variantSkus?: string[];
   variantBarcodes?: string[];
@@ -39,7 +40,8 @@ export default function InventoryPage() {
     
     // Filtros de UI
     const [searchQuery, setSearchQuery] = useState("");
-    const [filterType, setFilterType] = useState<"all" | "low" | "out">("all");
+    const [filterType, setFilterType] = useState<"all" | "low" | "out" | "published" | "unpublished">("all");
+    const [selectedIds, setSelectedIds] = useState<string[]>([]);
     const [filterCategory, setFilterCategory] = useState("");
 
     // Edición Pop-up
@@ -85,6 +87,7 @@ export default function InventoryPage() {
                   category_name: p.categories?.name ?? "",
                   is_consignment: p.is_consignment ?? false,
                   has_variants: p.has_variants ?? false,
+                  is_published: p.is_published ?? false,
                   barcode: p.barcode ?? null,
                   variantSkus: (p.product_variants ?? []).map((v: any) => v.sku).filter(Boolean),
                   variantBarcodes: (p.product_variants ?? []).map((v: any) => v.barcode).filter(Boolean),
@@ -115,6 +118,8 @@ export default function InventoryPage() {
         let matchesFilter = true;
         if (filterType === "low") matchesFilter = (p.stockCount > 0 && p.stockCount <= 5);
         if (filterType === "out") matchesFilter = (p.stockCount === 0);
+        if (filterType === "published") matchesFilter = !!p.is_published;
+        if (filterType === "unpublished") matchesFilter = !p.is_published;
 
         const q = searchQuery.toLowerCase();
         const matchesSearch = searchQuery
@@ -147,6 +152,7 @@ export default function InventoryPage() {
 
                 {/* Stats */}
                 <InventoryStats 
+                   published={allProducts.filter(p => p.is_published).length}
                    total={totalProducts} 
                    lowStock={lowStockCount} 
                    outOfStock={outOfStockCount} 
@@ -171,6 +177,8 @@ export default function InventoryPage() {
                    isLoading={isLoading} 
                    onRefresh={fetchProducts}
                    onEdit={(p) => setEditingProduct(p)}
+                   selectedIds={selectedIds}
+                   setSelectedIds={setSelectedIds}
                 />
 
             </div>
