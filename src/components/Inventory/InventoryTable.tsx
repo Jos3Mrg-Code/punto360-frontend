@@ -23,6 +23,8 @@ export default function InventoryTable({ products, isLoading, onRefresh, onEdit,
   const canViewFinancials = hasPermission("reports.view");
   const canManageInventory = hasPermission("inventory.manage") || user?.role === "ADMIN";
   const canEditProduct = canManageInventory;
+  // Publicar en la web no implica poder editar ni desactivar productos
+  const canPublishProducts = canManageInventory || user?.role === "CAJERO";
   const [page, setPage] = useState(1);
 
   const goToLabels = (p: ProductRow) => {
@@ -108,7 +110,7 @@ export default function InventoryTable({ products, isLoading, onRefresh, onEdit,
       <div className="bg-app-card backdrop-blur-md border border-app-border rounded-2xl shadow-xl overflow-hidden min-w-0">
         
         {/* VISTA DESKTOP: TABLA */}
-      {canManageInventory && selectedIds.length > 0 && (
+      {canPublishProducts && selectedIds.length > 0 && (
         <div className="flex flex-wrap items-center gap-3 px-6 py-3 bg-cyan-500/10 border-b border-cyan-500/20">
           <span className="text-[11px] font-black text-cyan-400 uppercase tracking-widest">
             {selectedIds.length} seleccionado{selectedIds.length !== 1 ? 's' : ''}
@@ -140,7 +142,7 @@ export default function InventoryTable({ products, isLoading, onRefresh, onEdit,
           <table className="w-full text-sm text-left">
             <thead className="bg-app-accent/5 text-app-text-muted border-b border-app-border">
               <tr>
-                {canManageInventory && (
+                {canPublishProducts && (
                   <th className="pl-6 pr-2 py-4 w-10">
                     <input
                       type="checkbox"
@@ -166,7 +168,7 @@ export default function InventoryTable({ products, isLoading, onRefresh, onEdit,
                   key={p.id}
                   className={`transition-all group ${!p.is_active ? 'bg-app-bg opacity-50' : p.stockCount === 0 ? 'bg-rose-500/5 hover:bg-rose-500/10' : 'hover:bg-app-accent/5'}`}
                 >
-                  {canManageInventory && (
+                  {canPublishProducts && (
                     <td className="pl-6 pr-2 py-4">
                       <input
                         type="checkbox"
@@ -205,7 +207,7 @@ export default function InventoryTable({ products, isLoading, onRefresh, onEdit,
                         <Edit2 size={16} />
                       </button>
                     )}
-                    {canManageInventory && <button
+                    {canPublishProducts && <button
                        onClick={() => handleTogglePublish(p)}
                        className={`p-2 rounded-lg transition-all ${p.is_published ? 'bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20' : 'bg-app-bg text-app-text-muted hover:text-app-text'}`}
                        title={p.is_published ? "Publicado en la web - clic para retirar" : "No publicado - clic para publicar en la web"}
@@ -266,6 +268,15 @@ export default function InventoryTable({ products, isLoading, onRefresh, onEdit,
                           >
                               <Printer size={18} />
                           </button>
+                          {canPublishProducts && (
+                            <button
+                                onClick={() => handleTogglePublish(p)}
+                                className={`p-3 rounded-xl ${p.is_published ? 'bg-cyan-500/10 text-cyan-400' : 'bg-app-bg text-app-text-muted'}`}
+                                title={p.is_published ? "Retirar de la web" : "Publicar en la web"}
+                            >
+                                {p.is_published ? <Globe size={18} /> : <GlobeLock size={18} />}
+                            </button>
+                          )}
                           {canManageInventory && (
                             <button
                                 onClick={() => handleToggleStatus(p.id, p.is_active)}
