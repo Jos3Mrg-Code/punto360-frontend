@@ -25,9 +25,9 @@ const fmt = (n: number) =>
 
 const PLAN_INFO: Record<string, { label: string; color: string; icon: React.ElementType; price: number; period: string }> = {
     TRIAL:     { label: 'Prueba gratuita', color: 'text-cyan-400',   icon: Zap,   price: 0,       period: '7 días' },
-    MONTHLY:   { label: 'Mensual',         color: 'text-blue-400',   icon: Zap,   price: 120000,  period: '/mes' },
-    QUARTERLY: { label: 'Trimestral',      color: 'text-purple-400', icon: Star,  price: 320000,  period: '/3 meses' },
-    ANNUAL:    { label: 'Anual',           color: 'text-amber-400',  icon: Crown, price: 1100000, period: '/año' },
+    MONTHLY:   { label: 'Mensual',         color: 'text-blue-400',   icon: Zap,   price: 170000,  period: '/mes' },
+    QUARTERLY: { label: 'Trimestral',      color: 'text-purple-400', icon: Star,  price: 450000,  period: '/3 meses' },
+    ANNUAL:    { label: 'Anual',           color: 'text-amber-400',  icon: Crown, price: 1500000, period: '/año' },
 };
 
 // ── Sección reutilizable ────────────────────────────────────────────
@@ -345,9 +345,9 @@ function PlanesTab() {
     const endDate = status?.endDate ? new Date(status.endDate).toLocaleDateString('es-CO', { day: '2-digit', month: 'long', year: 'numeric' }) : null;
 
     const upgradePlans = [
-        { key: 'MONTHLY',   label: 'Mensual',    price: 120000,  period: '/mes',      icon: Zap,   color: 'border-blue-500/30 hover:border-blue-500/60',   badge: '' },
-        { key: 'QUARTERLY', label: 'Trimestral', price: 320000,  period: '/3 meses',  icon: Star,  color: 'border-purple-500/40 hover:border-purple-500/70', badge: 'Ahorra $40.000' },
-        { key: 'ANNUAL',    label: 'Anual',      price: 1100000, period: '/año',       icon: Crown, color: 'border-amber-500/30 hover:border-amber-500/60',  badge: 'Ahorra $340.000' },
+        { key: 'MONTHLY',   label: 'Mensual',    price: 170000,  period: '/mes',      icon: Zap,   color: 'border-blue-500/30 hover:border-blue-500/60',   badge: '' },
+        { key: 'QUARTERLY', label: 'Trimestral', price: 450000,  period: '/3 meses',  icon: Star,  color: 'border-purple-500/40 hover:border-purple-500/70', badge: 'Ahorra $60.000' },
+        { key: 'ANNUAL',    label: 'Anual',      price: 1500000, period: '/año',       icon: Crown, color: 'border-amber-500/30 hover:border-amber-500/60',  badge: 'Ahorra $540.000' },
     ];
 
     return (
