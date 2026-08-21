@@ -19,6 +19,11 @@ interface LabelConfig {
     showBarcode: boolean;
     printerName: string;
     printMode: "zpl" | "browser";
+    /** Lenguaje de la impresora termica. Zebra habla ZPL; TSC, Jaltech y
+     *  similares hablan TSPL. Ausente equivale a "zpl" (comportamiento previo). */
+    printerLang?: "zpl" | "tspl";
+    /** Separacion entre etiquetas del rollo, solo usada por TSPL */
+    gapMm?: number;
     dpi: 203 | 300;
 }
 
@@ -34,6 +39,8 @@ const DEFAULT_CONFIG: LabelConfig = {
     showBarcode: true,
     printerName: "",
     printMode: "browser",
+    printerLang: "zpl",
+    gapMm: 2,
     dpi: 203,
 };
 
@@ -256,6 +263,111 @@ function buildZPL(products: LabelProduct[], config: LabelConfig): string {
     return zpl;
 }
 
+
+/**
+ * Genera TSPL para impresoras TSC, Jaltech y compatibles.
+ * Mantiene la misma composicion que buildZPL, pero TSPL no tiene equivalente
+ * a ^FB: el centrado se calcula midiendo el texto, porque la fuente "0" es
+ * monoespaciada de 8x12 dots por caracter.
+ */
+function buildTSPL(products: LabelProduct[], config: LabelConfig): string {
+    const DPI  = config.dpi ?? 203;
+    const dots = (mm: number) => Math.round(mm * DPI / 25.4);
+
+    const labelW = dots(config.labelWidthMm);
+    const labelH = dots(config.labelHeightMm);
+    const cols   = config.columns;
+    const totalWmm = config.labelWidthMm * cols;
+
+    const margin  = Math.max(4, dots(config.marginMm));
+    const gap     = 3;
+    const vMargin = 5;
+
+    // La fuente "0" mide 8x12 dots y solo admite multiplicadores enteros
+    const BASE_W = 8, BASE_H = 12;
+    const mulFor = (alto: number) => Math.max(1, Math.round(alto / BASE_H));
+
+    const nameMul  = mulFor(Math.max(18, Math.min(Math.round(labelH * 0.14), 24)));
+    const priceMul = mulFor(Math.max(18, Math.min(Math.round(labelH * 0.16), 26)));
+    const skuMul   = mulFor(Math.max(13, Math.min(Math.round(labelH * 0.11), 17)));
+
+    const hOf = (mul: number) => BASE_H * mul;
+    const nameSlot  = config.showName  ? hOf(nameMul)  + gap : 0;
+    const skuSlot   = config.showSku   ? hOf(skuMul)   + gap : 0;
+    const priceSlot = config.showPrice ? hOf(priceMul) + gap : 0;
+
+    const bcH = config.showBarcode
+        ? Math.max(30, labelH - vMargin * 2 - nameSlot - skuSlot - priceSlot)
+        : 0;
+
+    // Code128 exige una zona muda de 6.35 mm a cada lado
+    const QZ     = Math.round(6.35 * DPI / 25.4);
+    const bcDots = (data: string) => data.length * 11 + 35;
+
+    const centerX = (texto: string, mul: number, colX: number) => {
+        const ancho = texto.length * BASE_W * mul;
+        return colX + Math.max(margin, Math.floor((labelW - ancho) / 2));
+    };
+
+    // Las comillas dobles delimitan el contenido en TSPL y romperian el comando
+    const esc = (t: string) => t.replace(/"/g, "'");
+
+    const rows: LabelProduct[][] = [];
+    for (let i = 0; i < products.length; i += cols) rows.push(products.slice(i, i + cols));
+
+    let out = "";
+
+    for (const row of rows) {
+        // SIZE abarca todas las columnas, equivalente a ^PW en ZPL
+        out += `SIZE ${totalWmm.toFixed(1)} mm,${config.labelHeightMm.toFixed(1)} mm\n`;
+        out += `GAP ${(config.gapMm ?? 2).toFixed(1)} mm,0 mm\n`;
+        out += "DIRECTION 1\n";
+        out += "CLS\n";
+
+        for (let c = 0; c < row.length; c++) {
+            const p    = row[c];
+            const colX = labelW * c;
+            const bv   = stripAccents(p.barcode || p.sku)
+                .replace(/[^A-Za-z0-9\-\. \$\/\+\%]/g, "").trim();
+            let y = vMargin;
+
+            if (config.showName) {
+                const name = stripAccents(p.name).substring(0, 22).toUpperCase();
+                out += `TEXT ${centerX(name, nameMul, colX)},${y},"0",0,${nameMul},${nameMul},"${esc(name)}"\n`;
+                y += nameSlot;
+            }
+
+            if (config.showBarcode && bv) {
+                const bcX = colX + Math.max(QZ, Math.floor((labelW - bcDots(bv)) / 2));
+                // El 0 tras la altura desactiva el texto legible: se dibuja aparte
+                out += `BARCODE ${bcX},${y},"128",${bcH},0,0,1,2,"${esc(bv)}"\n`;
+                y += bcH + gap;
+            }
+
+            if (config.showSku) {
+                const skuText = bv || p.sku;
+                out += `TEXT ${centerX(skuText, skuMul, colX)},${y},"0",0,${skuMul},${skuMul},"${esc(skuText)}"\n`;
+                y += skuSlot;
+            }
+
+            if (config.showPrice) {
+                const price = COP(p.sale_price).replace(/\s/g, "");
+                out += `TEXT ${centerX(price, priceMul, colX)},${y},"0",0,${priceMul},${priceMul},"${esc(price)}"\n`;
+            }
+        }
+
+        out += "PRINT 1,1\n";
+    }
+
+    return out;
+}
+
+/** Elige el lenguaje segun la impresora configurada; sin ajuste guardado usa ZPL */
+function buildLabelCode(products: LabelProduct[], config: LabelConfig): string {
+    return config.printerLang === "tspl"
+        ? buildTSPL(products, config)
+        : buildZPL(products, config);
+}
 
 async function printZplViaQZ(printerName: string, zpl: string): Promise<void> {
     const qz = await getQZ();
@@ -492,7 +604,7 @@ export default function LabelsPage() {
 
         if (config.printMode === "zpl" && config.printerName) {
             try {
-                const zpl = buildZPL(all, config);
+                const zpl = buildLabelCode(all, config);
                 await printZplViaQZ(config.printerName, zpl);
                 toast.success(`${totalLabels} etiqueta${totalLabels !== 1 ? "s" : ""} enviada${totalLabels !== 1 ? "s" : ""} a ${config.printerName}`);
             } catch (err: any) {
@@ -643,9 +755,9 @@ export default function LabelsPage() {
                                                 onClick={() => {
                                                     const all: LabelProduct[] = [];
                                                     for (const p of labelProducts) for (let i = 0; i < p.quantity; i++) all.push(p);
-                                                    const zpl = buildZPL(all, config);
+                                                    const zpl = buildLabelCode(all, config);
                                                     navigator.clipboard.writeText(zpl);
-                                                    toast.success("ZPL copiado al portapapeles");
+                                                    toast.success(`${config.printerLang === "tspl" ? "TSPL" : "ZPL"} copiado al portapapeles`);
                                                 }}
                                                 className="w-full py-2 rounded-xl border border-app-border text-app-text-muted text-xs hover:text-app-text transition-colors">
                                                 Copiar ZPL (debug)
@@ -709,7 +821,7 @@ export default function LabelsPage() {
                                     <button onClick={() => setCfg("printMode", "zpl")}
                                         className={`flex-1 py-3 px-3 rounded-xl border text-sm font-bold transition-all flex flex-col items-center gap-1 ${config.printMode === "zpl" ? "bg-emerald-600/20 border-emerald-500/50 text-emerald-300" : "border-app-border text-app-text-muted hover:border-emerald-500/30"}`}>
                                         <Wifi size={16} />
-                                        ZPL directo
+                                        Impresora térmica
                                         <span className="text-[10px] opacity-70 font-normal">Requiere QZ Tray</span>
                                     </button>
                                     <button onClick={() => setCfg("printMode", "browser")}
@@ -719,6 +831,40 @@ export default function LabelsPage() {
                                         <span className="text-[10px] opacity-70 font-normal">Sin instalación</span>
                                     </button>
                                 </div>
+
+                                {/* ZPL y TSPL no son intercambiables: la impresora entiende uno u otro */}
+                                {config.printMode === "zpl" && (
+                                    <div className="mb-4">
+                                        <p className="text-xs font-bold text-app-text-muted uppercase tracking-widest mb-2">Lenguaje de impresión</p>
+                                        <div className="flex gap-2">
+                                            <button onClick={() => setCfg("printerLang", "zpl")}
+                                                className={`flex-1 py-2.5 px-3 rounded-xl border text-sm font-bold transition-all flex flex-col items-center gap-0.5 ${(config.printerLang ?? "zpl") === "zpl" ? "bg-emerald-600/20 border-emerald-500/50 text-emerald-300" : "border-app-border text-app-text-muted hover:border-emerald-500/30"}`}>
+                                                ZPL
+                                                <span className="text-[10px] opacity-70 font-normal">Zebra</span>
+                                            </button>
+                                            <button onClick={() => setCfg("printerLang", "tspl")}
+                                                className={`flex-1 py-2.5 px-3 rounded-xl border text-sm font-bold transition-all flex flex-col items-center gap-0.5 ${config.printerLang === "tspl" ? "bg-cyan-600/20 border-cyan-500/50 text-cyan-300" : "border-app-border text-app-text-muted hover:border-cyan-500/30"}`}>
+                                                TSPL
+                                                <span className="text-[10px] opacity-70 font-normal">TSC, Jaltech</span>
+                                            </button>
+                                        </div>
+                                        <p className="text-[11px] text-app-text-muted mt-2 leading-snug">
+                                            Si la etiqueta sale en blanco o con los comandos impresos como texto, el lenguaje no coincide con la impresora.
+                                        </p>
+                                        {config.printerLang === "tspl" && (
+                                            <div className="mt-3 flex items-center gap-2">
+                                                <label className="text-xs text-app-text-muted">Separación entre etiquetas</label>
+                                                <input
+                                                    type="number" min={0} max={10} step={0.5}
+                                                    value={config.gapMm ?? 2}
+                                                    onChange={e => setCfg("gapMm", Number(e.target.value))}
+                                                    className="w-20 bg-app-bg border border-app-border rounded-lg px-2 py-1 text-app-text text-sm text-center focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+                                                />
+                                                <span className="text-xs text-app-text-muted">mm</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
 
                                 {/* Panel QZ Tray */}
                                 {config.printMode === "zpl" && (
