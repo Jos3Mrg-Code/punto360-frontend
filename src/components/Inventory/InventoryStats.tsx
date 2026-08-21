@@ -5,12 +5,14 @@ import { useAuth } from "../../auth/AuthContext";
 interface InventoryStatsProps {
     total: number;
     published: number;
+    /** Categoria o busqueda activa; vacio cuando se ve todo el inventario */
+    scopeLabel?: string;
     lowStock: number;
     outOfStock: number;
     valorizado: ProductRow[];
 }
 
-export default function InventoryStats({ total, published, lowStock, outOfStock, valorizado }: InventoryStatsProps) {
+export default function InventoryStats({ total, published, scopeLabel, lowStock, outOfStock, valorizado }: InventoryStatsProps) {
     const { hasPermission } = useAuth();
     const canViewFinancials = hasPermission("reports.view");
     const totalValue = valorizado.reduce((acc, p) => acc + (p.cost_price * p.stockCount), 0);
@@ -30,7 +32,9 @@ export default function InventoryStats({ total, published, lowStock, outOfStock,
                             <Layers size={20} />
                         </div>
                     </div>
-                    <p className="text-[10px] font-black text-app-text-muted uppercase tracking-widest leading-none mb-1 opacity-70">Total Productos</p>
+                    <p className="text-[10px] font-black text-app-text-muted uppercase tracking-widest leading-none mb-1 opacity-70">
+                        {scopeLabel ? `En ${scopeLabel}` : "Total Productos"}
+                    </p>
                     <h3 className="text-2xl md:text-3xl font-black text-app-text tracking-tight">{total}</h3>
                     <p className="text-[9px] font-black text-app-text-muted uppercase tracking-widest mt-1.5">{Math.round(unidadesTotales).toLocaleString('es-CO')} unidades en stock</p>
                     <p className="text-[9px] font-black text-cyan-400/80 uppercase tracking-widest mt-1.5">{published} publicados en web</p>

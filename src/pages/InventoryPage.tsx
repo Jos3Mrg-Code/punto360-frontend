@@ -106,33 +106,37 @@ export default function InventoryPage() {
     }, []);
 
     // Derived States
-    const totalProducts = allProducts.length;
-    const lowStockCount = allProducts.filter(p => p.stockCount > 0 && p.stockCount <= 5).length;
-    const outOfStockCount = allProducts.filter(p => p.stockCount === 0).length;
-
-    // Categorías únicas para el filtro
-    const categories = [...new Set(allProducts.map(p => p.category_name).filter(Boolean))].sort() as string[];
-
-    // Filter Logic
-    const filteredProducts = allProducts.filter(p => {
-        let matchesFilter = true;
-        if (filterType === "low") matchesFilter = (p.stockCount > 0 && p.stockCount <= 5);
-        if (filterType === "out") matchesFilter = (p.stockCount === 0);
-        if (filterType === "published") matchesFilter = !!p.is_published;
-        if (filterType === "unpublished") matchesFilter = !p.is_published;
-
+    // Ambito que el usuario esta mirando: categoria y busqueda.
+    // No incluye el filtro de estado a proposito: ese filtro es una vista
+    // sobre estas mismas cifras, y si tambien las moviera se perderia la
+    // referencia de cuantos productos hay en total.
+    const scopedProducts = allProducts.filter(p => {
         const q = searchQuery.toLowerCase();
         const matchesSearch = searchQuery
             ? p.name.toLowerCase().includes(q)
               || p.sku.toLowerCase().includes(q)
               || (p.barcode ?? "").toLowerCase().includes(q)
-              || (p.variantSkus ?? []).some(s => s.toLowerCase().includes(q))
+              || (p.variantSkus ?? []).some(x => x.toLowerCase().includes(q))
               || (p.variantBarcodes ?? []).some(b => b.toLowerCase().includes(q))
             : true;
-
         const matchesCategory = filterCategory ? p.category_name === filterCategory : true;
+        return matchesSearch && matchesCategory;
+    });
 
-        return matchesFilter && matchesSearch && matchesCategory;
+    const totalProducts = scopedProducts.length;
+    const lowStockCount = scopedProducts.filter(p => p.stockCount > 0 && p.stockCount <= 5).length;
+    const outOfStockCount = scopedProducts.filter(p => p.stockCount === 0).length;
+
+    // Categorías únicas para el filtro
+    const categories = [...new Set(allProducts.map(p => p.category_name).filter(Boolean))].sort() as string[];
+
+    // Filter Logic
+    const filteredProducts = scopedProducts.filter(p => {
+        if (filterType === "low") return p.stockCount > 0 && p.stockCount <= 5;
+        if (filterType === "out") return p.stockCount === 0;
+        if (filterType === "published") return !!p.is_published;
+        if (filterType === "unpublished") return !p.is_published;
+        return true;
     });
 
     return (
@@ -152,11 +156,12 @@ export default function InventoryPage() {
 
                 {/* Stats */}
                 <InventoryStats 
-                   published={allProducts.filter(p => p.is_published).length}
+                   published={scopedProducts.filter(p => p.is_published).length}
+                   scopeLabel={filterCategory || (searchQuery ? `"${searchQuery}"` : "")}
                    total={totalProducts} 
                    lowStock={lowStockCount} 
                    outOfStock={outOfStockCount} 
-                   valorizado={allProducts}
+                   valorizado={scopedProducts}
                 />
 
                 {/* Filtros */}
