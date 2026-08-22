@@ -165,7 +165,7 @@ function cartesian<T>(arrays: T[][]): T[][] {
 export default function NewProductFields({ initialData, onSaveSuccess, onCancel, fromPurchase = false }: NewProductFieldsProps) {
   const { user } = useAuth();
   const isEdit = !!initialData;
-  const canEditStock = !isEdit || user?.role === "ADMIN";
+  const canEditStock = (!isEdit || user?.role === "ADMIN") && !form.has_variants;
   const [activeProductId, setActiveProductId] = useState<string | null>(initialData?.id ?? null);
   const [productJustCreated, setProductJustCreated] = useState(false);
 
