@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Building2, User, Mail, Lock, CheckCircle2, Factory, MailCheck, ArrowRight, ArrowLeft } from 'lucide-react';
+import { Building2, User, Mail, Lock, CheckCircle2, Factory, MailCheck, ArrowRight, ArrowLeft, MapPin } from 'lucide-react';
 import { api } from '../api/axios';
 
 const inputCls = "w-full bg-black/20 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all";
@@ -13,6 +13,7 @@ export default function RegisterPage() {
 
     const [form, setForm] = useState({
         companyName: '',
+        branchName: '',
         name: '',
         email: '',
         emailConfirm: '',
@@ -43,6 +44,7 @@ export default function RegisterPage() {
         try {
             await api.post('/auth/register', {
                 companyName: form.companyName,
+                branchName: form.branchName || undefined,
                 name: form.name,
                 email: form.email,
                 password: form.password,
@@ -113,6 +115,11 @@ export default function RegisterPage() {
                                                 <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                                                 <input type="text" name="companyName" value={form.companyName} onChange={set}
                                                     placeholder="Nombre de la empresa" required autoFocus className={inputCls} />
+                                            </div>
+                                            <div className="relative">
+                                                <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                                                <input type="text" name="branchName" value={form.branchName} onChange={set}
+                                                    placeholder="Nombre de la sucursal (ej. Sede principal)" className={inputCls} />
                                             </div>
                                         </div>
                                         <button type="submit"
