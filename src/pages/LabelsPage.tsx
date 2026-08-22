@@ -220,6 +220,7 @@ function buildZPL(products: LabelProduct[], config: LabelConfig): string {
     // Quiet zone mínima: 51 dots ≈ 6.4 mm (estándar Code128 exige ≥ 6.35 mm)
     const QZ        = Math.round(6.35 * DPI / 25.4);   // ~51 dots
     const bcDots    = (data: string) => data.length * 11 + 35;  // BY1 → 1 dot/module
+    const vOffset   = 20;  // desplazamiento vertical global; necesario para alinear con el gap sensor
 
     const rows: LabelProduct[][] = [];
     for (let i = 0; i < products.length; i += cols) rows.push(products.slice(i, i + cols));
@@ -229,7 +230,7 @@ function buildZPL(products: LabelProduct[], config: LabelConfig): string {
     for (const row of rows) {
         // One ^XA…^XZ per label row; ^PW activates full printhead width for all columns
         const pitch = config.labelRowPitchMm ? dots(config.labelRowPitchMm) : labelH;
-        zpl += `^XA^LH0,0^LT0^PW${totalW}^LL${pitch}^CI28`;
+        zpl += `^XA^LH0,0^LT${vOffset}^PW${totalW}^LL${pitch}^CI28`;
 
         for (let c = 0; c < row.length; c++) {
             const p    = row[c];
@@ -385,13 +386,7 @@ async function printZplViaQZ(printerName: string, zpl: string): Promise<void> {
     const qz = await getQZ();
     await connectQZ(qz);
     const cfg = qz.configs.create(printerName);
-    // Algunas impresoras ZPL-compatibles solo imprimen el último bloque ^XA…^XZ
-    // cuando llegan concatenados. Dividir y enviar cada bloque por separado garantiza
-    // que todas las filas se impriman.
-    const blocks = zpl.match(/\^XA[\s\S]*?\^XZ/g) ?? [zpl];
-    for (const block of blocks) {
-        await qz.print(cfg, [{ type: "raw", format: "plain", data: block }]);
-    }
+    await qz.print(cfg, [{ type: "raw", format: "plain", data: zpl }]);
 }
 
 // ── Components ────────────────────────────────────────────────────────────────
