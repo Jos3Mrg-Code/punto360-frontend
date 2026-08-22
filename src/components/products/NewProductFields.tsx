@@ -971,7 +971,7 @@ export default function NewProductFields({ initialData, onSaveSuccess, onCancel,
                                 const qty = Number(e.target.value);
                                 if (qty === (v.stock[0]?.quantity ?? 0)) return;
                                 try {
-                                  await api.put(`/products/${activeProductId}/variants/${v.id}`, { stock: qty });
+                                  await api.patch(`/products/${activeProductId}/variants/${v.id}/stock`, { quantity: qty });
                                   toast.success("Stock actualizado");
                                 } catch { toast.error("Error al guardar stock"); }
                               }}
