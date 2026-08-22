@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { scannerNormalize } from "../../utils/scannerFix";
 import { X, Camera, CameraOff, RefreshCw, ScanLine } from "lucide-react";
 
 interface Props {
@@ -171,7 +172,7 @@ export default function BarcodeScannerModal({ onScan, onClose }: Props) {
                             type="text"
                             placeholder="Código manual..."
                             value={manualCode}
-                            onChange={e => setManualCode(e.target.value)}
+                            onChange={e => setManualCode(scannerNormalize(e.target.value))}
                             onKeyDown={e => e.key === "Enter" && handleManual()}
                             className="flex-1 bg-app-card border border-app-border rounded-xl px-3 py-2 text-app-text text-sm focus:outline-none focus:ring-2 focus:ring-app-accent/40 font-mono"
                         />

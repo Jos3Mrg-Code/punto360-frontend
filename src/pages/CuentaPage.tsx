@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { api } from '../api/axios';
 import DashboardLayout from '../layouts/DashboardLayout';
+import { isScannerFixEnabled, setScannerFix } from '../utils/scannerFix';
 
 type Tab = 'perfil' | 'empresa' | 'sucursales' | 'planes';
 
@@ -64,6 +65,12 @@ function PerfilTab() {
     const [pwd, setPwd] = useState({ current: '', next: '', confirm: '' });
     const [savingPwd, setSavingPwd] = useState(false);
     const [pwdMsg, setPwdMsg] = useState('');
+    const [scannerFix, setScannerFixState] = useState(isScannerFixEnabled);
+
+    const toggleScannerFix = (val: boolean) => {
+        setScannerFix(val);
+        setScannerFixState(val);
+    };
 
     useEffect(() => {
         api.get('/users/me').then(({ data }) => { setName(data.name); setEmail(data.email); });
@@ -122,6 +129,21 @@ function PerfilTab() {
                 </div>
                 <Msg text={pwdMsg} />
                 <SaveBtn loading={savingPwd} onClick={savePassword} label="Cambiar contraseña" />
+            </Section>
+
+            <Section title="Configuración del dispositivo">
+                <div className="flex items-center justify-between">
+                    <div>
+                        <p className="text-sm font-medium text-app-text">Corrección de escáner (guión)</p>
+                        <p className="text-xs text-app-text-muted mt-0.5">Convierte <code className="bg-app-bg px-1 rounded">'</code> → <code className="bg-app-bg px-1 rounded">-</code> al escanear códigos. Activa solo si tu pistola lee guiones como apóstrofes.</p>
+                    </div>
+                    <button
+                        onClick={() => toggleScannerFix(!scannerFix)}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${scannerFix ? 'bg-app-accent' : 'bg-app-border'}`}
+                    >
+                        <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${scannerFix ? 'translate-x-6' : 'translate-x-1'}`} />
+                    </button>
+                </div>
             </Section>
         </div>
     );

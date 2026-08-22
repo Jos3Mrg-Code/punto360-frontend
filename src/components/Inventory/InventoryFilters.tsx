@@ -1,4 +1,5 @@
 import { NavLink } from "react-router-dom";
+import { scannerNormalize } from "../../utils/scannerFix";
 import { Plus, Search, Filter, ScanLine } from "lucide-react";
 import { useState, lazy, Suspense } from "react";
 
@@ -83,7 +84,7 @@ export default function InventoryFilters({ searchQuery, setSearchQuery, filterTy
                             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-app-text-muted opacity-40" size={18} />
                             <input
                                 value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
+                                onChange={(e) => setSearchQuery(scannerNormalize(e.target.value))}
                                 type="text"
                                 placeholder="Buscar por SKU, barcode o nombre..."
                                 className="w-full bg-app-bg border border-app-border rounded-xl pl-12 pr-4 py-3 text-app-text text-sm placeholder-app-text-muted/30 focus:outline-none focus:ring-2 focus:ring-app-accent/30 transition-all font-bold"

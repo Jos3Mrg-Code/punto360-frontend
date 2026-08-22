@@ -1,4 +1,5 @@
 import { toast } from "../lib/toast";
+import { scannerNormalize } from "../utils/scannerFix";
 import { useEffect, useState, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import DashboardLayout from "../layouts/DashboardLayout";
@@ -515,7 +516,7 @@ export default function PosPage() {
             type="text"
             placeholder="Escanear o buscar producto..."
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => setSearchQuery(scannerNormalize(e.target.value))}
             className="w-full bg-app-card border border-app-border rounded-2xl pl-12 pr-4 py-3 text-app-text placeholder-app-text-muted focus:outline-none focus:border-app-accent/50 font-medium text-sm shadow-sm"
             autoFocus
           />
