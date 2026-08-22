@@ -383,7 +383,9 @@ function buildTSPL(products: LabelProduct[], config: LabelConfig): string {
                 ? Math.max(25, Math.min(55, labelH - vMargin * 2 - nameSlot - skuSlot - priceSlot))
                 : 0;
 
-            let y = vMargin;
+            // Centrado vertical: calcular altura total del contenido y arrancar desde el centro
+            const totalContentH = nameSlot + (config.showBarcode && bv ? bcH + gap : 0) + skuSlot + priceSlot;
+            let y = Math.max(vMargin, Math.floor((labelH - totalContentH) / 2));
 
             if (config.showName) {
                 for (const line of nameLines) {
