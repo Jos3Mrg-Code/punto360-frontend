@@ -22,8 +22,10 @@ interface LabelConfig {
     /** Lenguaje de la impresora termica. Zebra habla ZPL; TSC, Jaltech y
      *  similares hablan TSPL. Ausente equivale a "zpl" (comportamiento previo). */
     printerLang?: "zpl" | "tspl";
-    /** Separacion entre etiquetas del rollo, solo usada por TSPL */
+    /** Separacion entre etiquetas del rollo (TSPL: avance entre etiquetas) */
     gapMm?: number;
+    /** Gap horizontal entre columnas en ZPL, en mm. 0 = etiquetas pegadas. */
+    columnGapMm?: number;
     dpi: 203 | 300;
 }
 
@@ -41,6 +43,7 @@ const DEFAULT_CONFIG: LabelConfig = {
     printMode: "browser",
     printerLang: "zpl",
     gapMm: 2,
+    columnGapMm: 0,
     dpi: 203,
 };
 
@@ -180,7 +183,9 @@ function buildZPL(products: LabelProduct[], config: LabelConfig): string {
     const labelW = dots(config.labelWidthMm);    // 289 @ 36.1mm 203dpi
     const labelH = dots(config.labelHeightMm);   // 153 @ 19.1mm 203dpi
     const cols   = config.columns;
-    const totalW = labelW * cols;                 // 867
+    // Gap horizontal entre columnas en dots (0 = etiquetas pegadas sin espacio)
+    const colGap = dots(config.columnGapMm ?? 0);
+    const totalW = labelW * cols + colGap * (cols - 1);
 
     // Margin only for text fields; barcode spans full column for max width
     const margin  = Math.max(4, dots(config.marginMm));
@@ -211,7 +216,6 @@ function buildZPL(products: LabelProduct[], config: LabelConfig): string {
     // Quiet zone mínima: 51 dots ≈ 6.4 mm (estándar Code128 exige ≥ 6.35 mm)
     const QZ        = Math.round(6.35 * DPI / 25.4);   // ~51 dots
     const bcDots    = (data: string) => data.length * 11 + 35;  // BY1 → 1 dot/module
-    const vOffset   = 20;  // dots de desplazamiento vertical global (ajustar para centrar)
 
     const rows: LabelProduct[][] = [];
     for (let i = 0; i < products.length; i += cols) rows.push(products.slice(i, i + cols));
@@ -220,11 +224,12 @@ function buildZPL(products: LabelProduct[], config: LabelConfig): string {
 
     for (const row of rows) {
         // One ^XA…^XZ per label row; ^PW activates full printhead width for all columns
-        zpl += `^XA^LH0,0^LT${vOffset}^PW${totalW}^LL${labelH}^CI28`;
+        zpl += `^XA^LH0,0^PW${totalW}^LL${labelH}^CI28`;
 
         for (let c = 0; c < row.length; c++) {
             const p    = row[c];
-            const colX = labelW * c;
+            // El gap entre columnas se acumula: col 0 en X=0, col 1 en X=labelW+gap, etc.
+            const colX = (labelW + colGap) * c;
             const bv   = stripAccents(p.barcode || p.sku)
                 .replace(/[^A-Za-z0-9\-\. \$\/\+\%]/g, "").trim();
             let y = vMargin;
@@ -266,24 +271,30 @@ function buildZPL(products: LabelProduct[], config: LabelConfig): string {
 
 /**
  * Genera TSPL para impresoras TSC, Jaltech y compatibles.
- * Mantiene la misma composicion que buildZPL, pero TSPL no tiene equivalente
- * a ^FB: el centrado se calcula midiendo el texto, porque la fuente "0" es
- * monoespaciada de 8x12 dots por caracter.
+ * TSPL para impresoras Jaltech/TSC.
+ *
+ * Diferencia clave con ZPL: SIZE declara el tamaño de UNA etiqueta física,
+ * no el ancho total del rollo. Si se declara SIZE = anchoEtiqueta × columnas,
+ * la impresora interpreta que la etiqueta mide ese ancho y el contenido queda
+ * comprimido o recortado.
+ *
+ * El rollo multi-columna posiciona las etiquetas físicamente: el sistema solo
+ * necesita emitir una etiqueta por producto con PRINT 1,1 y la impresora avanza
+ * al siguiente espacio del rollo. La configuración de columnas no aplica en TSPL.
  */
 function buildTSPL(products: LabelProduct[], config: LabelConfig): string {
     const DPI  = config.dpi ?? 203;
     const dots = (mm: number) => Math.round(mm * DPI / 25.4);
 
+    // SIZE = una sola etiqueta: la impresora gestiona el avance entre columnas
     const labelW = dots(config.labelWidthMm);
     const labelH = dots(config.labelHeightMm);
-    const cols   = config.columns;
-    const totalWmm = config.labelWidthMm * cols;
 
     const margin  = Math.max(4, dots(config.marginMm));
     const gap     = 3;
-    const vMargin = 5;
+    const vMargin = 4;
 
-    // La fuente "0" mide 8x12 dots y solo admite multiplicadores enteros
+    // Fuente "0": 8×12 dots por caracter, solo multiplicadores enteros
     const BASE_W = 8, BASE_H = 12;
     const mulFor = (alto: number) => Math.max(1, Math.round(alto / BASE_H));
 
@@ -297,65 +308,61 @@ function buildTSPL(products: LabelProduct[], config: LabelConfig): string {
     const priceSlot = config.showPrice ? hOf(priceMul) + gap : 0;
 
     const bcH = config.showBarcode
-        ? Math.max(30, labelH - vMargin * 2 - nameSlot - skuSlot - priceSlot)
+        ? Math.max(25, labelH - vMargin * 2 - nameSlot - skuSlot - priceSlot)
         : 0;
 
-    // Code128 exige una zona muda de 6.35 mm a cada lado
+    // Code128 zona muda mínima: 6.35mm a cada lado
     const QZ     = Math.round(6.35 * DPI / 25.4);
     const bcDots = (data: string) => data.length * 11 + 35;
 
-    const centerX = (texto: string, mul: number, colX: number) => {
+    // Centrado sobre el ancho de UNA etiqueta (sin colX)
+    const centerX = (texto: string, mul: number) => {
         const ancho = texto.length * BASE_W * mul;
-        return colX + Math.max(margin, Math.floor((labelW - ancho) / 2));
+        return Math.max(margin, Math.floor((labelW - ancho) / 2));
     };
 
-    // Las comillas dobles delimitan el contenido en TSPL y romperian el comando
     const esc = (t: string) => t.replace(/"/g, "'");
 
-    const rows: LabelProduct[][] = [];
-    for (let i = 0; i < products.length; i += cols) rows.push(products.slice(i, i + cols));
+    // Cabecera una sola vez: SIZE de una etiqueta, no del rollo completo
+    const header = [
+        `SIZE ${config.labelWidthMm.toFixed(1)} mm,${config.labelHeightMm.toFixed(1)} mm`,
+        `GAP ${(config.gapMm ?? 2).toFixed(1)} mm,0 mm`,
+        "DIRECTION 1",
+    ].join("\n") + "\n";
 
-    let out = "";
+    let out = header;
 
-    for (const row of rows) {
-        // SIZE abarca todas las columnas, equivalente a ^PW en ZPL
-        out += `SIZE ${totalWmm.toFixed(1)} mm,${config.labelHeightMm.toFixed(1)} mm\n`;
-        out += `GAP ${(config.gapMm ?? 2).toFixed(1)} mm,0 mm\n`;
-        out += "DIRECTION 1\n";
+    for (const p of products) {
+        const bv = stripAccents(p.barcode || p.sku)
+            .replace(/[^A-Za-z0-9\-\. \$\/\+\%]/g, "").trim();
+        let y = vMargin;
         out += "CLS\n";
 
-        for (let c = 0; c < row.length; c++) {
-            const p    = row[c];
-            const colX = labelW * c;
-            const bv   = stripAccents(p.barcode || p.sku)
-                .replace(/[^A-Za-z0-9\-\. \$\/\+\%]/g, "").trim();
-            let y = vMargin;
-
-            if (config.showName) {
-                const name = stripAccents(p.name).substring(0, 22).toUpperCase();
-                out += `TEXT ${centerX(name, nameMul, colX)},${y},"0",0,${nameMul},${nameMul},"${esc(name)}"\n`;
-                y += nameSlot;
-            }
-
-            if (config.showBarcode && bv) {
-                const bcX = colX + Math.max(QZ, Math.floor((labelW - bcDots(bv)) / 2));
-                // El 0 tras la altura desactiva el texto legible: se dibuja aparte
-                out += `BARCODE ${bcX},${y},"128",${bcH},0,0,1,2,"${esc(bv)}"\n`;
-                y += bcH + gap;
-            }
-
-            if (config.showSku) {
-                const skuText = bv || p.sku;
-                out += `TEXT ${centerX(skuText, skuMul, colX)},${y},"0",0,${skuMul},${skuMul},"${esc(skuText)}"\n`;
-                y += skuSlot;
-            }
-
-            if (config.showPrice) {
-                const price = COP(p.sale_price).replace(/\s/g, "");
-                out += `TEXT ${centerX(price, priceMul, colX)},${y},"0",0,${priceMul},${priceMul},"${esc(price)}"\n`;
-            }
+        if (config.showName) {
+            const name = stripAccents(p.name).substring(0, 22).toUpperCase();
+            out += `TEXT ${centerX(name, nameMul)},${y},"0",0,${nameMul},${nameMul},"${esc(name)}"\n`;
+            y += nameSlot;
         }
 
+        if (config.showBarcode && bv) {
+            const bw  = bcDots(bv);
+            const bcX = Math.max(QZ, Math.floor((labelW - bw) / 2));
+            out += `BARCODE ${bcX},${y},"128",${bcH},0,0,1,2,"${esc(bv)}"\n`;
+            y += bcH + gap;
+        }
+
+        if (config.showSku) {
+            const skuText = bv || p.sku;
+            out += `TEXT ${centerX(skuText, skuMul)},${y},"0",0,${skuMul},${skuMul},"${esc(skuText)}"\n`;
+            y += skuSlot;
+        }
+
+        if (config.showPrice) {
+            const price = COP(p.sale_price).replace(/\s/g, "");
+            out += `TEXT ${centerX(price, priceMul)},${y},"0",0,${priceMul},${priceMul},"${esc(price)}"\n`;
+        }
+
+        // Imprimir una etiqueta; el rollo avanza al siguiente espacio solo
         out += "PRINT 1,1\n";
     }
 
@@ -458,7 +465,7 @@ export default function LabelsPage() {
     const [availablePrinters, setAvailablePrinters] = useState<string[]>([]);
     const [showPrinterDropdown, setShowPrinterDropdown] = useState(false);
 
-    const detectPrinters = async () => {
+    const detectPrinters = async (silent = false) => {
         setQzStatus("connecting");
         try {
             const printers = await listPrinters();
@@ -467,12 +474,19 @@ export default function LabelsPage() {
             if (printers.length > 0 && !config.printerName) {
                 setCfg("printerName", printers[0]);
             }
-            toast.success(`${printers.length} impresora${printers.length !== 1 ? "s" : ""} detectada${printers.length !== 1 ? "s" : ""}`);
+            if (!silent) toast.success(`${printers.length} impresora${printers.length !== 1 ? "s" : ""} detectada${printers.length !== 1 ? "s" : ""}`);
         } catch {
             setQzStatus("error");
-            toast.error("No se pudo conectar a QZ Tray");
+            if (!silent) toast.error("No se pudo conectar a QZ Tray");
         }
     };
+
+    // Auto-conectar al cargar si el modo es térmico — evita tener que pulsar
+    // "Detectar" en cada recarga de página
+    useEffect(() => {
+        if (config.printMode === "zpl") detectPrinters(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     // ── Print Queue ───────────────────────────────────────────────────────────
     interface QueueItem { id: string; label: string; sku: string; quantity: number; sale_price: number; }
@@ -863,6 +877,18 @@ export default function LabelsPage() {
                                                 <span className="text-xs text-app-text-muted">mm</span>
                                             </div>
                                         )}
+                                        {(config.printerLang ?? "zpl") === "zpl" && (config.columns ?? 1) > 1 && (
+                                            <div className="mt-3 flex items-center gap-2">
+                                                <label className="text-xs text-app-text-muted">Gap entre columnas</label>
+                                                <input
+                                                    type="number" min={0} max={20} step={0.5}
+                                                    value={config.columnGapMm ?? 0}
+                                                    onChange={e => setCfg("columnGapMm", Number(e.target.value))}
+                                                    className="w-20 bg-app-bg border border-app-border rounded-lg px-2 py-1 text-app-text text-sm text-center focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+                                                />
+                                                <span className="text-xs text-app-text-muted">mm (0 = etiquetas pegadas)</span>
+                                            </div>
+                                        )}
                                     </div>
                                 )}
 
@@ -880,7 +906,7 @@ export default function LabelsPage() {
                                                     {qzConnected ? "QZ Tray conectado" : qzError ? "QZ Tray no disponible" : "QZ Tray no conectado"}
                                                 </span>
                                             </div>
-                                            <button onClick={detectPrinters} disabled={qzStatus === "connecting"}
+                                            <button onClick={() => detectPrinters(false)} disabled={qzStatus === "connecting"}
                                                 className="px-3 py-1.5 bg-emerald-600/20 border border-emerald-500/30 text-emerald-400 text-xs font-bold rounded-lg hover:bg-emerald-600/30 transition-colors disabled:opacity-50">
                                                 {qzStatus === "connecting" ? "Conectando..." : "Detectar impresoras"}
                                             </button>
