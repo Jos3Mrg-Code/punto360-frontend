@@ -385,7 +385,13 @@ async function printZplViaQZ(printerName: string, zpl: string): Promise<void> {
     const qz = await getQZ();
     await connectQZ(qz);
     const cfg = qz.configs.create(printerName);
-    await qz.print(cfg, [{ type: "raw", format: "plain", data: zpl }]);
+    // Algunas impresoras ZPL-compatibles solo imprimen el último bloque ^XA…^XZ
+    // cuando llegan concatenados. Dividir y enviar cada bloque por separado garantiza
+    // que todas las filas se impriman.
+    const blocks = zpl.match(/\^XA[\s\S]*?\^XZ/g) ?? [zpl];
+    for (const block of blocks) {
+        await qz.print(cfg, [{ type: "raw", format: "plain", data: block }]);
+    }
 }
 
 // ── Components ────────────────────────────────────────────────────────────────
