@@ -292,9 +292,10 @@ function buildTSPL(products: LabelProduct[], config: LabelConfig): string {
     const DPI  = config.dpi ?? 203;
     const dots = (mm: number) => Math.round(mm * DPI / 25.4);
 
-    // SIZE = una sola etiqueta: la impresora gestiona el avance entre columnas
     const labelW = dots(config.labelWidthMm);
     const labelH = dots(config.labelHeightMm);
+    const cols   = config.columns;
+    const colGap = dots(config.columnGapMm ?? 0);
 
     const margin  = Math.max(4, dots(config.marginMm));
     const gap     = 3;
@@ -338,66 +339,78 @@ function buildTSPL(products: LabelProduct[], config: LabelConfig): string {
     const QZ     = Math.round(6.35 * DPI / 25.4);
     const bcDots = (data: string) => data.length * 11 + 35;
 
-    // Centrado sobre el ancho de UNA etiqueta (sin colX)
-    const centerX = (texto: string, mul: number) => {
+    // Centrado dentro de la columna indicada por colX
+    const centerX = (colX: number, texto: string, mul: number) => {
         const ancho = texto.length * BASE_W * mul;
-        return Math.max(margin, Math.floor((labelW - ancho) / 2));
+        return colX + Math.max(margin, Math.floor((labelW - ancho) / 2));
     };
 
     const esc = (t: string) => t.replace(/"/g, "'");
 
-    // Cabecera una sola vez: SIZE de una etiqueta, no del rollo completo
+    // SIZE = ancho total del papel para que todas las columnas queden en un solo bloque.
+    // Igual que ^PW en ZPL: la impresora imprime toda la fila de una vez.
+    const paperWidthMm = config.pageWidthMm > 0
+        ? config.pageWidthMm
+        : config.labelWidthMm * cols;
+
     const header = [
-        `SIZE ${config.labelWidthMm.toFixed(1)} mm,${config.labelHeightMm.toFixed(1)} mm`,
+        `SIZE ${paperWidthMm.toFixed(1)} mm,${config.labelHeightMm.toFixed(1)} mm`,
         `GAP ${(config.gapMm ?? 2).toFixed(1)} mm,0 mm`,
         "DIRECTION 0",
     ].join("\n") + "\n";
 
+    // Agrupar productos en filas igual que ZPL
+    const rows: LabelProduct[][] = [];
+    for (let i = 0; i < products.length; i += cols) rows.push(products.slice(i, i + cols));
+
     let out = header;
 
-    for (const p of products) {
-        const bv = stripAccents(p.barcode || p.sku)
-            .replace(/[^A-Za-z0-9\-\. \$\/\+\%]/g, "").trim();
-
-        // Pre-calcular renglones del nombre para reservar espacio correcto al código de barras
-        const nameLines = config.showName
-            ? wrapWords(stripAccents(p.name).toUpperCase(), charsPerLine, 2)
-            : [];
-        const nameSlot = nameLines.length * (hOf(nameMul) + gap);
-
-        const bcH = config.showBarcode
-            ? Math.max(25, labelH - vMargin * 2 - nameSlot - skuSlot - priceSlot)
-            : 0;
-
-        let y = vMargin;
+    for (const row of rows) {
         out += "CLS\n";
 
-        if (config.showName) {
-            for (const line of nameLines) {
-                out += `TEXT ${centerX(line, nameMul)},${y},"0",0,${nameMul},${nameMul},"${esc(line)}"\n`;
-                y += hOf(nameMul) + gap;
+        for (let c = 0; c < row.length; c++) {
+            const p    = row[c];
+            const colX = (labelW + colGap) * c;
+            const bv   = stripAccents(p.barcode || p.sku)
+                .replace(/[^A-Za-z0-9\-\. \$\/\+\%]/g, "").trim();
+
+            const nameLines = config.showName
+                ? wrapWords(stripAccents(p.name).toUpperCase(), charsPerLine, 2)
+                : [];
+            const nameSlot = nameLines.length * (hOf(nameMul) + gap);
+            const bcH = config.showBarcode
+                ? Math.max(25, labelH - vMargin * 2 - nameSlot - skuSlot - priceSlot)
+                : 0;
+
+            let y = vMargin;
+
+            if (config.showName) {
+                for (const line of nameLines) {
+                    out += `TEXT ${centerX(colX, line, nameMul)},${y},"0",0,${nameMul},${nameMul},"${esc(line)}"\n`;
+                    y += hOf(nameMul) + gap;
+                }
+            }
+
+            if (config.showBarcode && bv) {
+                const bw  = bcDots(bv);
+                const bcX = colX + Math.max(QZ, Math.floor((labelW - bw) / 2));
+                out += `BARCODE ${bcX},${y},"128",${bcH},0,0,1,2,"${esc(bv)}"\n`;
+                y += bcH + gap;
+            }
+
+            if (config.showSku) {
+                const skuText = bv || p.sku;
+                out += `TEXT ${centerX(colX, skuText, skuMul)},${y},"0",0,${skuMul},${skuMul},"${esc(skuText)}"\n`;
+                y += skuSlot;
+            }
+
+            if (config.showPrice) {
+                const price = COP(p.sale_price).replace(/\s/g, "");
+                out += `TEXT ${centerX(colX, price, priceMul)},${y},"0",0,${priceMul},${priceMul},"${esc(price)}"\n`;
             }
         }
 
-        if (config.showBarcode && bv) {
-            const bw  = bcDots(bv);
-            const bcX = Math.max(QZ, Math.floor((labelW - bw) / 2));
-            out += `BARCODE ${bcX},${y},"128",${bcH},0,0,1,2,"${esc(bv)}"\n`;
-            y += bcH + gap;
-        }
-
-        if (config.showSku) {
-            const skuText = bv || p.sku;
-            out += `TEXT ${centerX(skuText, skuMul)},${y},"0",0,${skuMul},${skuMul},"${esc(skuText)}"\n`;
-            y += skuSlot;
-        }
-
-        if (config.showPrice) {
-            const price = COP(p.sale_price).replace(/\s/g, "");
-            out += `TEXT ${centerX(price, priceMul)},${y},"0",0,${priceMul},${priceMul},"${esc(price)}"\n`;
-        }
-
-        // Imprimir una etiqueta; el rollo avanza al siguiente espacio solo
+        // Una fila completa = un PRINT; el rollo avanza al siguiente grupo de etiquetas
         out += "PRINT 1,1\n";
     }
 
