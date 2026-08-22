@@ -216,6 +216,7 @@ export default function NewProductFields({ initialData, onSaveSuccess, onCancel,
   });
 
   const canEditStock = (!isEdit || user?.role === "ADMIN") && !form.has_variants;
+  const canEditVariantStock = user?.role === "ADMIN";
 
   const fetchCategoriesAndSku = async () => {
     try {
@@ -962,7 +963,7 @@ export default function NewProductFields({ initialData, onSaveSuccess, onCancel,
                       <div className="flex items-center gap-3">
                         <div className="text-right">
                           <p className="text-emerald-400 font-black text-sm">${Number(v.sale_price).toLocaleString()}</p>
-                          {canEditStock ? (
+                          {canEditVariantStock ? (
                             <input
                               type="number"
                               min="0"
