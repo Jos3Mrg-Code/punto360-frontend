@@ -305,7 +305,8 @@ function buildTSPL(products: LabelProduct[], config: LabelConfig): string {
     const BASE_W = 8, BASE_H = 12;
     const mulFor = (alto: number) => Math.max(1, Math.round(alto / BASE_H));
 
-    const nameMul  = mulFor(Math.max(18, Math.min(Math.round(labelH * 0.14), 24)));
+    // Nombre siempre en mul=1 (texto pequeño) para que quepan 2 renglones con nombres largos
+    const nameMul  = 1;
     const priceMul = mulFor(Math.max(18, Math.min(Math.round(labelH * 0.16), 26)));
     const skuMul   = mulFor(Math.max(13, Math.min(Math.round(labelH * 0.11), 17)));
 
@@ -313,7 +314,7 @@ function buildTSPL(products: LabelProduct[], config: LabelConfig): string {
     const skuSlot   = config.showSku   ? hOf(skuMul)   + gap : 0;
     const priceSlot = config.showPrice ? hOf(priceMul) + gap : 0;
 
-    // Chars que caben por renglón al multiplicador del nombre
+    // Con mul=1: ~33 chars por línea en etiqueta de 36mm
     const charsPerLine = Math.max(8, Math.floor((labelW - 2 * margin) / (BASE_W * nameMul)));
 
     // Word-wrap: divide en palabras y corta al máximo de renglones
@@ -379,7 +380,7 @@ function buildTSPL(products: LabelProduct[], config: LabelConfig): string {
                 : [];
             const nameSlot = nameLines.length * (hOf(nameMul) + gap);
             const bcH = config.showBarcode
-                ? Math.max(25, labelH - vMargin * 2 - nameSlot - skuSlot - priceSlot)
+                ? Math.max(25, Math.min(55, labelH - vMargin * 2 - nameSlot - skuSlot - priceSlot))
                 : 0;
 
             let y = vMargin;
