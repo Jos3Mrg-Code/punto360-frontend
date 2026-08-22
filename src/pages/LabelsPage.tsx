@@ -309,13 +309,30 @@ function buildTSPL(products: LabelProduct[], config: LabelConfig): string {
     const skuMul   = mulFor(Math.max(13, Math.min(Math.round(labelH * 0.11), 17)));
 
     const hOf = (mul: number) => BASE_H * mul;
-    const nameSlot  = config.showName  ? hOf(nameMul)  + gap : 0;
     const skuSlot   = config.showSku   ? hOf(skuMul)   + gap : 0;
     const priceSlot = config.showPrice ? hOf(priceMul) + gap : 0;
 
-    const bcH = config.showBarcode
-        ? Math.max(25, labelH - vMargin * 2 - nameSlot - skuSlot - priceSlot)
-        : 0;
+    // Chars que caben por renglón al multiplicador del nombre
+    const charsPerLine = Math.max(8, Math.floor((labelW - 2 * margin) / (BASE_W * nameMul)));
+
+    // Word-wrap: divide en palabras y corta al máximo de renglones
+    const wrapWords = (text: string, maxChars: number, maxLines: number): string[] => {
+        const words = text.split(" ");
+        const lines: string[] = [];
+        let current = "";
+        for (const word of words) {
+            const test = current ? `${current} ${word}` : word;
+            if (test.length <= maxChars) {
+                current = test;
+            } else {
+                if (current) lines.push(current);
+                if (lines.length >= maxLines - 1) { current = ""; break; }
+                current = word.substring(0, maxChars);
+            }
+        }
+        if (current && lines.length < maxLines) lines.push(current);
+        return lines;
+    };
 
     // Code128 zona muda mínima: 6.35mm a cada lado
     const QZ     = Math.round(6.35 * DPI / 25.4);
@@ -341,13 +358,25 @@ function buildTSPL(products: LabelProduct[], config: LabelConfig): string {
     for (const p of products) {
         const bv = stripAccents(p.barcode || p.sku)
             .replace(/[^A-Za-z0-9\-\. \$\/\+\%]/g, "").trim();
+
+        // Pre-calcular renglones del nombre para reservar espacio correcto al código de barras
+        const nameLines = config.showName
+            ? wrapWords(stripAccents(p.name).toUpperCase(), charsPerLine, 2)
+            : [];
+        const nameSlot = nameLines.length * (hOf(nameMul) + gap);
+
+        const bcH = config.showBarcode
+            ? Math.max(25, labelH - vMargin * 2 - nameSlot - skuSlot - priceSlot)
+            : 0;
+
         let y = vMargin;
         out += "CLS\n";
 
         if (config.showName) {
-            const name = stripAccents(p.name).substring(0, 22).toUpperCase();
-            out += `TEXT ${centerX(name, nameMul)},${y},"0",0,${nameMul},${nameMul},"${esc(name)}"\n`;
-            y += nameSlot;
+            for (const line of nameLines) {
+                out += `TEXT ${centerX(line, nameMul)},${y},"0",0,${nameMul},${nameMul},"${esc(line)}"\n`;
+                y += hOf(nameMul) + gap;
+            }
         }
 
         if (config.showBarcode && bv) {
