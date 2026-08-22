@@ -165,7 +165,6 @@ function cartesian<T>(arrays: T[][]): T[][] {
 export default function NewProductFields({ initialData, onSaveSuccess, onCancel, fromPurchase = false }: NewProductFieldsProps) {
   const { user } = useAuth();
   const isEdit = !!initialData;
-  const canEditStock = (!isEdit || user?.role === "ADMIN") && !form.has_variants;
   const [activeProductId, setActiveProductId] = useState<string | null>(initialData?.id ?? null);
   const [productJustCreated, setProductJustCreated] = useState(false);
 
@@ -215,6 +214,8 @@ export default function NewProductFields({ initialData, onSaveSuccess, onCancel,
     is_consignment: false,
     has_variants: true,
   });
+
+  const canEditStock = (!isEdit || user?.role === "ADMIN") && !form.has_variants;
 
   const fetchCategoriesAndSku = async () => {
     try {
