@@ -239,11 +239,9 @@ function buildZPL(products: LabelProduct[], config: LabelConfig): string {
                 .replace(/[^A-Za-z0-9\-\. \$\/\+\%]/g, "").trim();
             let y = vMargin;
 
-            // 1. Nombre — ^FB centra en innerW, trunca a 22 chars
+            // 1. Nombre — ^FB centra en innerW, trunca a 22 chars (ZPL maneja overflow internamente)
             if (config.showName) {
-                // Calcular cuántos chars caben en el ancho de columna con este multiplicador
-        const maxNameChars = Math.max(6, Math.floor((labelW - 2 * margin) / (BASE_W * nameMul)));
-        const name = stripAccents(p.name).substring(0, maxNameChars).toUpperCase();
+                const name = stripAccents(p.name).substring(0, 22).toUpperCase();
                 zpl += `^FO${colX + margin},${y}^A0N,${nameH},${nameW}^FB${innerW},1,0,C^FD${name}^FS`;
                 y += nameSlot;
             }
