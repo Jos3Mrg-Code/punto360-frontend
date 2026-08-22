@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useAuth } from "../../auth/AuthContext";
 import { api } from "../../api/axios";
 import { PlusCircle, Loader2, Layers, Trash2, Plus, X, ChevronDown, ChevronUp, CheckCircle2, Sparkles, ScanLine } from "lucide-react";
 import { toast } from "../../lib/toast";
@@ -162,7 +163,9 @@ function cartesian<T>(arrays: T[][]): T[][] {
 }
 
 export default function NewProductFields({ initialData, onSaveSuccess, onCancel, fromPurchase = false }: NewProductFieldsProps) {
+  const { user } = useAuth();
   const isEdit = !!initialData;
+  const canEditStock = !isEdit || user?.role === "ADMIN";
   const [activeProductId, setActiveProductId] = useState<string | null>(initialData?.id ?? null);
   const [productJustCreated, setProductJustCreated] = useState(false);
 
@@ -628,14 +631,13 @@ export default function NewProductFields({ initialData, onSaveSuccess, onCancel,
                <div>
                  <label className="block flex justify-between text-sm font-medium text-app-text-muted mb-1">
                      Stock {form.unit_type === "WEIGHT" ? "(Cantidad ej. 1.5)" : "(Unidades)"}
-                     {isEdit && <span className="text-[10px] text-rose-400 font-normal ml-2" title="Requiere ajuste formal">(Protegido)</span>}
                  </label>
                  <input
                    required
                    type="number"
                    step={form.unit_type === "WEIGHT" ? "0.001" : "1"}
-                   disabled={isEdit}
-                   className={`w-full border rounded-xl px-4 py-3 focus:outline-none transition-all ${isEdit ? 'bg-app-bg/30 border-rose-500/20 text-app-text-muted cursor-not-allowed' : 'bg-app-bg border-app-border text-app-text focus:ring-2 focus:ring-app-accent/50'}`}
+                   disabled={!canEditStock}
+                   className={`w-full border rounded-xl px-4 py-3 focus:outline-none transition-all ${!canEditStock ? 'bg-app-bg/30 border-rose-500/20 text-app-text-muted cursor-not-allowed' : 'bg-app-bg border-app-border text-app-text focus:ring-2 focus:ring-app-accent/50'}`}
                    placeholder={form.unit_type === "WEIGHT" ? "Ej. 25.500" : "Ej. 50"}
                    value={form.stock}
                    onChange={(e) => setForm({ ...form, stock: e.target.value })}
@@ -959,7 +961,25 @@ export default function NewProductFields({ initialData, onSaveSuccess, onCancel,
                       <div className="flex items-center gap-3">
                         <div className="text-right">
                           <p className="text-emerald-400 font-black text-sm">${Number(v.sale_price).toLocaleString()}</p>
-                          <p className="text-app-text-muted text-[10px]">{v.stock[0]?.quantity ?? 0} un. stock</p>
+                          {canEditStock ? (
+                            <input
+                              type="number"
+                              min="0"
+                              step="1"
+                              defaultValue={v.stock[0]?.quantity ?? 0}
+                              onBlur={async (e) => {
+                                const qty = Number(e.target.value);
+                                if (qty === (v.stock[0]?.quantity ?? 0)) return;
+                                try {
+                                  await api.put(`/products/${activeProductId}/variants/${v.id}`, { stock: qty });
+                                  toast.success("Stock actualizado");
+                                } catch { toast.error("Error al guardar stock"); }
+                              }}
+                              className="w-16 bg-app-bg border border-app-border rounded-lg px-2 py-0.5 text-xs text-center text-app-text focus:outline-none focus:border-app-accent/50"
+                            />
+                          ) : (
+                            <p className="text-app-text-muted text-[10px]">{v.stock[0]?.quantity ?? 0} un. stock</p>
+                          )}
                         </div>
                         <input
                           type="text"

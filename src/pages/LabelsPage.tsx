@@ -24,11 +24,8 @@ interface LabelConfig {
     printerLang?: "zpl" | "tspl";
     /** Separacion entre etiquetas del rollo (TSPL: avance entre etiquetas) */
     gapMm?: number;
-    /** Gap horizontal entre columnas en ZPL, en mm. 0 = etiquetas pegadas. */
+    /** Gap horizontal entre columnas en TSPL, en mm. 0 = etiquetas pegadas. */
     columnGapMm?: number;
-    /** Pitch vertical del rollo ZPL = altura de etiqueta + gap entre filas.
-     *  Si no se ajusta, ^LL usa solo la altura y la fila 2 queda desplazada. */
-    labelRowPitchMm?: number;
     dpi: 203 | 300;
 }
 
@@ -47,7 +44,6 @@ const DEFAULT_CONFIG: LabelConfig = {
     printerLang: "zpl",
     gapMm: 2,
     columnGapMm: 0,
-    labelRowPitchMm: 0,
     dpi: 203,
 };
 
@@ -187,9 +183,7 @@ function buildZPL(products: LabelProduct[], config: LabelConfig): string {
     const labelW = dots(config.labelWidthMm);    // 289 @ 36.1mm 203dpi
     const labelH = dots(config.labelHeightMm);   // 153 @ 19.1mm 203dpi
     const cols   = config.columns;
-    // Gap horizontal entre columnas en dots (0 = etiquetas pegadas sin espacio)
-    const colGap = dots(config.columnGapMm ?? 0);
-    const totalW = labelW * cols + colGap * (cols - 1);
+    const totalW = labelW * cols;
 
     // Margin only for text fields; barcode spans full column for max width
     const margin  = Math.max(4, dots(config.marginMm));
@@ -229,13 +223,11 @@ function buildZPL(products: LabelProduct[], config: LabelConfig): string {
 
     for (const row of rows) {
         // One ^XA…^XZ per label row; ^PW activates full printhead width for all columns
-        const pitch = config.labelRowPitchMm ? dots(config.labelRowPitchMm) : labelH;
-        zpl += `^XA^LH0,0^LT${vOffset}^PW${totalW}^LL${pitch}^CI28`;
+        zpl += `^XA^LH0,0^LT${vOffset}^PW${totalW}^LL${labelH}^CI28`;
 
         for (let c = 0; c < row.length; c++) {
             const p    = row[c];
-            // El gap entre columnas se acumula: col 0 en X=0, col 1 en X=labelW+gap, etc.
-            const colX = (labelW + colGap) * c;
+            const colX = labelW * c;
             const bv   = stripAccents(p.barcode || p.sku)
                 .replace(/[^A-Za-z0-9\-\. \$\/\+\%]/g, "").trim();
             let y = vMargin;
@@ -926,33 +918,6 @@ export default function LabelsPage() {
                                                     className="w-20 bg-app-bg border border-app-border rounded-lg px-2 py-1 text-app-text text-sm text-center focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
                                                 />
                                                 <span className="text-xs text-app-text-muted">mm</span>
-                                            </div>
-                                        )}
-                                        {(config.printerLang ?? "zpl") === "zpl" && (config.columns ?? 1) > 1 && (
-                                            <div className="mt-3 flex flex-col gap-2">
-                                                <div className="flex items-center gap-2">
-                                                    <label className="text-xs text-app-text-muted w-36">Gap entre columnas</label>
-                                                    <input
-                                                        type="number" min={0} max={20} step={0.5}
-                                                        value={config.columnGapMm ?? 0}
-                                                        onChange={e => setCfg("columnGapMm", Number(e.target.value))}
-                                                        className="w-20 bg-app-bg border border-app-border rounded-lg px-2 py-1 text-app-text text-sm text-center focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
-                                                    />
-                                                    <span className="text-xs text-app-text-muted">mm</span>
-                                                </div>
-                                                <div className="flex items-center gap-2">
-                                                    <label className="text-xs text-app-text-muted w-36">Pitch vertical</label>
-                                                    <input
-                                                        type="number" min={0} max={100} step={0.5}
-                                                        value={config.labelRowPitchMm ?? 0}
-                                                        onChange={e => setCfg("labelRowPitchMm", Number(e.target.value))}
-                                                        className="w-20 bg-app-bg border border-app-border rounded-lg px-2 py-1 text-app-text text-sm text-center focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
-                                                    />
-                                                    <span className="text-xs text-app-text-muted">mm (alto + gap, 0 = solo alto)</span>
-                                                </div>
-                                                <p className="text-[10px] text-app-text-muted leading-snug">
-                                                    Si se saltan etiquetas: ajusta el pitch al alto físico de la etiqueta + el gap vertical entre filas (mídelo en el rollo).
-                                                </p>
                                             </div>
                                         )}
                                     </div>
