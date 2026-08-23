@@ -347,7 +347,7 @@ export default function ExchangesPage() {
                   products={products}
                   value={retProduct}
                   variant={retVariant}
-                  onSelect={p => { setRetProduct(p); setRetVariant(null); setRetPrice(p.has_variants ? "" : String(p.sale_price)); }}
+                  onSelect={p => { setRetProduct(p); setRetVariant(null); setRetPrice(p ? (p.has_variants ? "" : String(p.sale_price)) : ""); }}
                   onVariantSelect={v => { setRetVariant(v); if (v) setRetPrice(String(v.sale_price)); }}
                 />
                 {retProduct && (!retProduct.has_variants || retVariant) && (
@@ -376,7 +376,7 @@ export default function ExchangesPage() {
               products={products}
               value={newProduct}
               variant={newVariant}
-              onSelect={p => { setNewProduct(p); setNewVariant(null); setNewPrice(p.has_variants ? "" : String(p.sale_price)); }}
+              onSelect={p => { setNewProduct(p); setNewVariant(null); setNewPrice(p ? (p.has_variants ? "" : String(p.sale_price)) : ""); }}
               onVariantSelect={v => { setNewVariant(v); if (v) setNewPrice(String(v.sale_price)); }}
             />
             {newProduct && (!newProduct.has_variants || newVariant) && (
