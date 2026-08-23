@@ -347,8 +347,8 @@ export default function ExchangesPage() {
                   products={products}
                   value={retProduct}
                   variant={retVariant}
-                  onSelect={p => { setRetProduct(p); setRetVariant(null); }}
-                  onVariantSelect={setRetVariant}
+                  onSelect={p => { setRetProduct(p); setRetVariant(null); setRetPrice(p.has_variants ? "" : String(p.sale_price)); }}
+                  onVariantSelect={v => { setRetVariant(v); if (v) setRetPrice(String(v.sale_price)); }}
                 />
                 {retProduct && (!retProduct.has_variants || retVariant) && (
                   <div>
