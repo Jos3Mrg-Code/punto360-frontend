@@ -448,7 +448,9 @@ function PlanesTab() {
 function IntegracionesTab() {
     const [connected, setConnected] = useState<string | null>(null);
     const [form, setForm] = useState({ store: '', token: '', locationId: '' });
+    const [oauthShop, setOauthShop] = useState('');
     const [saving, setSaving] = useState(false);
+    const [connecting, setConnecting] = useState(false);
     const [msg, setMsg] = useState('');
     const [disconnecting, setDisconnecting] = useState(false);
 
@@ -457,6 +459,7 @@ function IntegracionesTab() {
             if (data.shopify_store) {
                 setConnected(data.shopify_store);
                 setForm(f => ({ ...f, store: data.shopify_store }));
+                setOauthShop(data.shopify_store);
             }
         });
     }, []);
@@ -480,6 +483,20 @@ function IntegracionesTab() {
         }
     };
 
+    const connectOAuth = async () => {
+        if (!oauthShop.trim()) return setMsg('Ingresa el dominio de la tienda.');
+        setConnecting(true); setMsg('');
+        try {
+            const { data } = await api.get(`/shopify/connect-url?shop=${encodeURIComponent(oauthShop.trim())}`);
+            window.open(data.url, '_blank');
+            setMsg('Se abrió la ventana de Shopify. Luego de autorizar, recarga esta página.');
+        } catch (e: any) {
+            setMsg(e?.response?.data?.message || 'Error al generar el enlace.');
+        } finally {
+            setConnecting(false);
+        }
+    };
+
     const disconnect = async () => {
         if (!confirm('¿Deseas desvincular Shopify de esta empresa?')) return;
         setDisconnecting(true);
@@ -487,6 +504,7 @@ function IntegracionesTab() {
             await api.delete('/shopify/credentials');
             setConnected(null);
             setForm({ store: '', token: '', locationId: '' });
+            setOauthShop('');
             setMsg('Shopify desvinculado.');
         } catch {
             setMsg('Error al desvincular.');
@@ -513,48 +531,70 @@ function IntegracionesTab() {
                     </div>
                 ) : null}
 
-                <p className="text-xs text-app-text-muted">
-                    Crea una <strong>Custom App</strong> en tu Admin de Shopify → Configuración → Apps → Desarrollar apps, otorga permisos de inventario y pega los datos aquí.
-                </p>
+                {/* Opción 1: OAuth (Dev Dashboard) */}
+                <div className="border border-app-border rounded-xl p-4 space-y-3">
+                    <p className="text-xs font-semibold text-app-text uppercase tracking-wide">Opción A — OAuth (Dev Dashboard)</p>
+                    <div>
+                        <label className={labelCls}>Dominio de la tienda</label>
+                        <input
+                            className={inputCls}
+                            value={oauthShop}
+                            onChange={e => setOauthShop(e.target.value)}
+                            placeholder="ej. mitienda.myshopify.com"
+                        />
+                    </div>
+                    <button
+                        onClick={connectOAuth}
+                        disabled={connecting}
+                        className="flex items-center gap-2 px-4 py-2 bg-[#5C6AC4] hover:opacity-90 disabled:opacity-50 rounded-xl text-white text-sm font-medium transition-all"
+                    >
+                        {connecting ? <Loader2 size={14} className="animate-spin" /> : <Link2 size={14} />}
+                        Conectar via OAuth
+                    </button>
+                </div>
 
-                <div>
-                    <label className={labelCls}>Dominio de la tienda</label>
-                    <input
-                        className={inputCls}
-                        value={form.store}
-                        onChange={e => setForm(f => ({ ...f, store: e.target.value }))}
-                        placeholder="ej. mitienda.myshopify.com"
-                    />
-                </div>
-                <div>
-                    <label className={labelCls}>Admin API Access Token</label>
-                    <input
-                        type="password"
-                        className={inputCls}
-                        value={form.token}
-                        onChange={e => setForm(f => ({ ...f, token: e.target.value }))}
-                        placeholder="shpat_xxxxxxxxxxxxxxxxxxxx"
-                    />
-                </div>
-                <div>
-                    <label className={labelCls}>Location ID</label>
-                    <input
-                        className={inputCls}
-                        value={form.locationId}
-                        onChange={e => setForm(f => ({ ...f, locationId: e.target.value }))}
-                        placeholder="ej. 12345678901"
-                    />
+                {/* Opción 2: token manual */}
+                <div className="border border-app-border rounded-xl p-4 space-y-3">
+                    <p className="text-xs font-semibold text-app-text uppercase tracking-wide">Opción B — Token manual (Custom App)</p>
+                    <div>
+                        <label className={labelCls}>Dominio de la tienda</label>
+                        <input
+                            className={inputCls}
+                            value={form.store}
+                            onChange={e => setForm(f => ({ ...f, store: e.target.value }))}
+                            placeholder="ej. mitienda.myshopify.com"
+                        />
+                    </div>
+                    <div>
+                        <label className={labelCls}>Admin API Access Token</label>
+                        <input
+                            type="password"
+                            className={inputCls}
+                            value={form.token}
+                            onChange={e => setForm(f => ({ ...f, token: e.target.value }))}
+                            placeholder="shpat_xxxxxxxxxxxxxxxxxxxx"
+                        />
+                    </div>
+                    <div>
+                        <label className={labelCls}>Location ID</label>
+                        <input
+                            className={inputCls}
+                            value={form.locationId}
+                            onChange={e => setForm(f => ({ ...f, locationId: e.target.value }))}
+                            placeholder="ej. 12345678901"
+                        />
+                    </div>
+                    <button
+                        onClick={save}
+                        disabled={saving}
+                        className="flex items-center gap-2 px-4 py-2 bg-app-accent hover:opacity-90 disabled:opacity-50 rounded-xl text-white text-sm font-medium transition-all"
+                    >
+                        {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                        {connected ? 'Actualizar credenciales' : 'Guardar credenciales'}
+                    </button>
                 </div>
 
                 <Msg text={msg} />
-                <button
-                    onClick={save}
-                    disabled={saving}
-                    className="flex items-center gap-2 px-5 py-2 bg-[#5C6AC4] hover:opacity-90 disabled:opacity-50 rounded-xl text-white text-sm font-medium transition-all"
-                >
-                    {saving ? <Loader2 size={15} className="animate-spin" /> : <Link2 size={15} />}
-                    {connected ? 'Actualizar credenciales' : 'Conectar Shopify'}
-                </button>
             </Section>
         </div>
     );
