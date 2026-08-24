@@ -446,56 +446,114 @@ function PlanesTab() {
 
 // ── Integraciones ────────────────────────────────────────────────────
 function IntegracionesTab() {
-    const [shop, setShop] = useState('');
-    const [connecting, setConnecting] = useState(false);
-    const [msg, setMsg] = useState('');
     const [connected, setConnected] = useState<string | null>(null);
+    const [form, setForm] = useState({ store: '', token: '', locationId: '' });
+    const [saving, setSaving] = useState(false);
+    const [msg, setMsg] = useState('');
+    const [disconnecting, setDisconnecting] = useState(false);
 
     useEffect(() => {
         api.get('/companies/me').then(({ data }) => {
-            if (data.shopify_store) setConnected(data.shopify_store);
+            if (data.shopify_store) {
+                setConnected(data.shopify_store);
+                setForm(f => ({ ...f, store: data.shopify_store }));
+            }
         });
     }, []);
 
-    const connect = async () => {
-        if (!shop.trim()) return setMsg('Ingresa el dominio de la tienda.');
-        setConnecting(true); setMsg('');
+    const save = async () => {
+        if (!form.store.trim() || !form.token.trim() || !form.locationId.trim())
+            return setMsg('Todos los campos son obligatorios.');
+        setSaving(true); setMsg('');
         try {
-            const { data } = await api.get(`/shopify/connect-url?shop=${encodeURIComponent(shop.trim())}`);
-            window.open(data.url, '_blank');
-            setMsg('Se abrió la ventana de autorización de Shopify. Una vez autorices, cierra esta ventana y recarga la página.');
+            await api.patch('/shopify/credentials', {
+                store: form.store.trim(),
+                token: form.token.trim(),
+                locationId: form.locationId.trim(),
+            });
+            setConnected(form.store.trim());
+            setMsg('Shopify conectado correctamente.');
         } catch (e: any) {
-            setMsg(e?.response?.data?.message || 'Error al generar el enlace.');
+            setMsg(e?.response?.data?.message || 'Error al guardar.');
         } finally {
-            setConnecting(false);
+            setSaving(false);
+        }
+    };
+
+    const disconnect = async () => {
+        if (!confirm('¿Deseas desvincular Shopify de esta empresa?')) return;
+        setDisconnecting(true);
+        try {
+            await api.delete('/shopify/credentials');
+            setConnected(null);
+            setForm({ store: '', token: '', locationId: '' });
+            setMsg('Shopify desvinculado.');
+        } catch {
+            setMsg('Error al desvincular.');
+        } finally {
+            setDisconnecting(false);
         }
     };
 
     return (
         <div className="max-w-lg space-y-5">
             <Section title="Shopify">
-                {connected && (
-                    <div className="flex items-center gap-2 text-sm text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded-xl px-4 py-2.5">
-                        <Check size={14} /> Conectado a <span className="font-mono font-semibold">{connected}</span>
+                {connected ? (
+                    <div className="flex items-center justify-between gap-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl px-4 py-3">
+                        <div className="flex items-center gap-2 text-sm text-emerald-400">
+                            <Check size={14} /> Conectado a <span className="font-mono font-semibold">{connected}</span>
+                        </div>
+                        <button
+                            onClick={disconnect}
+                            disabled={disconnecting}
+                            className="text-xs text-red-400 hover:text-red-300 transition-colors"
+                        >
+                            {disconnecting ? <Loader2 size={13} className="animate-spin" /> : 'Desvincular'}
+                        </button>
                     </div>
-                )}
+                ) : null}
+
+                <p className="text-xs text-app-text-muted">
+                    Crea una <strong>Custom App</strong> en tu Admin de Shopify → Configuración → Apps → Desarrollar apps, otorga permisos de inventario y pega los datos aquí.
+                </p>
+
                 <div>
-                    <label className={labelCls}>Dominio de la tienda (.myshopify.com)</label>
+                    <label className={labelCls}>Dominio de la tienda</label>
                     <input
                         className={inputCls}
-                        value={shop}
-                        onChange={e => setShop(e.target.value)}
+                        value={form.store}
+                        onChange={e => setForm(f => ({ ...f, store: e.target.value }))}
                         placeholder="ej. mitienda.myshopify.com"
                     />
                 </div>
+                <div>
+                    <label className={labelCls}>Admin API Access Token</label>
+                    <input
+                        type="password"
+                        className={inputCls}
+                        value={form.token}
+                        onChange={e => setForm(f => ({ ...f, token: e.target.value }))}
+                        placeholder="shpat_xxxxxxxxxxxxxxxxxxxx"
+                    />
+                </div>
+                <div>
+                    <label className={labelCls}>Location ID</label>
+                    <input
+                        className={inputCls}
+                        value={form.locationId}
+                        onChange={e => setForm(f => ({ ...f, locationId: e.target.value }))}
+                        placeholder="ej. 12345678901"
+                    />
+                </div>
+
                 <Msg text={msg} />
                 <button
-                    onClick={connect}
-                    disabled={connecting}
+                    onClick={save}
+                    disabled={saving}
                     className="flex items-center gap-2 px-5 py-2 bg-[#5C6AC4] hover:opacity-90 disabled:opacity-50 rounded-xl text-white text-sm font-medium transition-all"
                 >
-                    {connecting ? <Loader2 size={15} className="animate-spin" /> : <Link2 size={15} />}
-                    {connected ? 'Reconectar Shopify' : 'Conectar Shopify'}
+                    {saving ? <Loader2 size={15} className="animate-spin" /> : <Link2 size={15} />}
+                    {connected ? 'Actualizar credenciales' : 'Conectar Shopify'}
                 </button>
             </Section>
         </div>
