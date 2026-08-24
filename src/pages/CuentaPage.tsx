@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react';
 import {
     User, Building2, GitBranch, Save, Plus, Pencil,
-    Trash2, X, Check, Loader2, CreditCard, Zap, Star, Crown, ArrowRight,
+    Trash2, X, Check, Loader2, CreditCard, Zap, Star, Crown, ArrowRight, Link2,
 } from 'lucide-react';
 import { api } from '../api/axios';
 import DashboardLayout from '../layouts/DashboardLayout';
 import { isScannerFixEnabled, setScannerFix } from '../utils/scannerFix';
 
-type Tab = 'perfil' | 'empresa' | 'sucursales' | 'planes';
+type Tab = 'perfil' | 'empresa' | 'sucursales' | 'planes' | 'integraciones';
 
 const inputCls =
     'w-full bg-app-bg border border-app-border rounded-xl px-4 py-2.5 text-app-text placeholder-app-text-muted focus:outline-none focus:ring-2 focus:ring-app-accent/40 transition-all text-sm';
@@ -15,10 +15,11 @@ const inputCls =
 const labelCls = 'text-xs font-medium text-app-text-muted mb-1 block uppercase tracking-wide';
 
 const TABS: { key: Tab; label: string; icon: React.ElementType }[] = [
-    { key: 'perfil',      label: 'Mi perfil',   icon: User },
-    { key: 'empresa',     label: 'Mi empresa',  icon: Building2 },
-    { key: 'sucursales',  label: 'Sucursales',  icon: GitBranch },
-    { key: 'planes',      label: 'Plan',         icon: CreditCard },
+    { key: 'perfil',         label: 'Mi perfil',      icon: User },
+    { key: 'empresa',        label: 'Mi empresa',     icon: Building2 },
+    { key: 'sucursales',     label: 'Sucursales',     icon: GitBranch },
+    { key: 'planes',         label: 'Plan',           icon: CreditCard },
+    { key: 'integraciones',  label: 'Integraciones',  icon: Link2 },
 ];
 
 const fmt = (n: number) =>
@@ -443,6 +444,64 @@ function PlanesTab() {
     );
 }
 
+// ── Integraciones ────────────────────────────────────────────────────
+function IntegracionesTab() {
+    const [shop, setShop] = useState('');
+    const [connecting, setConnecting] = useState(false);
+    const [msg, setMsg] = useState('');
+    const [connected, setConnected] = useState<string | null>(null);
+
+    useEffect(() => {
+        api.get('/companies/me').then(({ data }) => {
+            if (data.shopify_store) setConnected(data.shopify_store);
+        });
+    }, []);
+
+    const connect = async () => {
+        if (!shop.trim()) return setMsg('Ingresa el dominio de la tienda.');
+        setConnecting(true); setMsg('');
+        try {
+            const { data } = await api.get(`/shopify/connect-url?shop=${encodeURIComponent(shop.trim())}`);
+            window.open(data.url, '_blank');
+            setMsg('Se abrió la ventana de autorización de Shopify. Una vez autorices, cierra esta ventana y recarga la página.');
+        } catch (e: any) {
+            setMsg(e?.response?.data?.message || 'Error al generar el enlace.');
+        } finally {
+            setConnecting(false);
+        }
+    };
+
+    return (
+        <div className="max-w-lg space-y-5">
+            <Section title="Shopify">
+                {connected && (
+                    <div className="flex items-center gap-2 text-sm text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded-xl px-4 py-2.5">
+                        <Check size={14} /> Conectado a <span className="font-mono font-semibold">{connected}</span>
+                    </div>
+                )}
+                <div>
+                    <label className={labelCls}>Dominio de la tienda (.myshopify.com)</label>
+                    <input
+                        className={inputCls}
+                        value={shop}
+                        onChange={e => setShop(e.target.value)}
+                        placeholder="ej. mitienda.myshopify.com"
+                    />
+                </div>
+                <Msg text={msg} />
+                <button
+                    onClick={connect}
+                    disabled={connecting}
+                    className="flex items-center gap-2 px-5 py-2 bg-[#5C6AC4] hover:opacity-90 disabled:opacity-50 rounded-xl text-white text-sm font-medium transition-all"
+                >
+                    {connecting ? <Loader2 size={15} className="animate-spin" /> : <Link2 size={15} />}
+                    {connected ? 'Reconectar Shopify' : 'Conectar Shopify'}
+                </button>
+            </Section>
+        </div>
+    );
+}
+
 // ── Página principal ────────────────────────────────────────────────
 export default function CuentaPage() {
     const [tab, setTab] = useState<Tab>('perfil');
@@ -472,10 +531,11 @@ export default function CuentaPage() {
                 </div>
             </div>
 
-            {tab === 'perfil'     && <PerfilTab />}
-            {tab === 'empresa'    && <EmpresaTab />}
-            {tab === 'sucursales' && <SucursalesTab />}
-            {tab === 'planes'     && <PlanesTab />}
+            {tab === 'perfil'        && <PerfilTab />}
+            {tab === 'empresa'       && <EmpresaTab />}
+            {tab === 'sucursales'    && <SucursalesTab />}
+            {tab === 'planes'        && <PlanesTab />}
+            {tab === 'integraciones' && <IntegracionesTab />}
         </DashboardLayout>
     );
 }
