@@ -6,8 +6,9 @@ import { api } from "../api/axios";
 import { useAuth } from "../auth/AuthContext";
 import {
     PackagePlus, Search, Trash2, Plus, ChevronDown, ChevronUp,
-    Loader2, CheckCircle2, Truck, Calendar, ShoppingBag, Layers, Pause, RotateCcw, X, Ban, AlertTriangle
+    Loader2, CheckCircle2, Truck, Calendar, ShoppingBag, Layers, Pause, RotateCcw, X, Ban, AlertTriangle, Printer
 } from "lucide-react";
+import { printPurchaseReceipt, getPaperWidth, type ReceiptHeader } from "../lib/receipt";
 import NewProductFields, { type SavedProduct } from "../components/products/NewProductFields";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -132,7 +133,11 @@ export default function PurchasesPage() {
     // ── Payment state ──────────────────────────────────────────────────────────
     const [paidAmount, setPaidAmount] = useState<string>("");
     const [paymentMethod, setPaymentMethod] = useState("CASH");
-    const [paymentSource, setPaymentSource] = useState<"CASH" | "CARTERA">("CASH");
+    const [paymentSource, setPaymentSource] = useState<"CASH" | "CARTERA" | "EXTERNAL">("CASH");
+
+    // ── Receipt info (para reimprimir compras) ─────────────────────────────────
+    const [receiptInfo, setReceiptInfo] = useState<ReceiptHeader | null>(null);
+    const REPRINT_COMPANY_ID = '61f9fec7-468a-4574-a1f5-dd9b9d444eee';
 
     // ── New product modal ──────────────────────────────────────────────────────
     const [showNewProductModal, setShowNewProductModal] = useState(false);
@@ -200,6 +205,31 @@ export default function PurchasesPage() {
             toast.error(err.response?.data?.message || "Error al registrar el abono");
         } finally { setIsSubmittingAbono(false); }
     };
+
+    const handlePrintPurchase = (p: PurchaseRecord) => {
+        const header: ReceiptHeader = {
+            company_name: receiptInfo?.company_name ?? user?.companyName ?? null,
+            document_number: receiptInfo?.document_number ?? null,
+            branch_name: receiptInfo?.branch_name ?? null,
+            address: receiptInfo?.address ?? null,
+            phone: receiptInfo?.phone ?? null,
+        };
+        const ok = printPurchaseReceipt(header, {
+            purchaseId: p.id,
+            date: new Date(p.created_at),
+            supplierName: p.suppliers?.name,
+            items: p.purchase_items.map(i => ({
+                name: i.products?.name ?? 'Producto',
+                quantity: Number(i.quantity),
+                cost: Number(i.cost),
+            })),
+            total: Number(p.total),
+            paidAmount: Number(p.paid_amount),
+            paymentMethod: p.purchase_payments?.[0]?.payment_method ?? null,
+        }, getPaperWidth());
+        if (!ok) toast.warning("El navegador bloqueó la ventana de impresión. Permite las ventanas emergentes de este sitio.");
+    };
+
     const [dueDate, setDueDate] = useState("");
 
     // ── Draft (pausa) ──────────────────────────────────────────────────────────
@@ -251,6 +281,9 @@ export default function PurchasesPage() {
             })));
         });
         fetchHistory();
+        if (isCajero && user?.companyId === REPRINT_COMPANY_ID) {
+            api.get("/companies/receipt-info").then(res => setReceiptInfo(res.data)).catch(() => {});
+        }
     }, []);
 
     const fetchHistory = async () => {
@@ -469,10 +502,10 @@ export default function PurchasesPage() {
                     salePrice: Number(i.salePrice) || undefined,
                 })),
                 total,
-                paidAmount: paidAmount ? parseFloat(paidAmount) : total,
+                paidAmount: paymentSource === 'EXTERNAL' ? total : (paidAmount ? parseFloat(paidAmount) : total),
                 paymentMethod: paymentSource === 'CARTERA' ? 'CASH' : paymentMethod,
                 paymentSource,
-                dueDate: dueDate || undefined,
+                dueDate: paymentSource === 'EXTERNAL' ? undefined : (dueDate || undefined),
             });
             setItems([]);
             setSelectedSupplier("");
@@ -1011,9 +1044,19 @@ export default function PurchasesPage() {
                                             >
                                                 Sale de Cartera
                                             </button>
+                                            <button
+                                                onClick={() => setPaymentSource("EXTERNAL")}
+                                                className={`flex-1 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider transition-all ${paymentSource === "EXTERNAL" ? "bg-emerald-600 text-white" : "text-app-text-muted hover:text-app-text"}`}
+                                            >
+                                                Ya pagada
+                                            </button>
                                         </div>
+                                        {paymentSource === "EXTERNAL" && (
+                                            <p className="text-[10px] text-emerald-400 mt-1.5">Factura ya cancelada — no afecta caja ni cartera.</p>
+                                        )}
                                     </div>
 
+                                    {paymentSource !== "EXTERNAL" && (
                                     <div className="grid grid-cols-2 gap-4">
                                         <div>
                                             <label className="block text-[10px] text-app-text-muted mb-1">Monto Pagado Inicial</label>
@@ -1039,8 +1082,9 @@ export default function PurchasesPage() {
                                             </select>
                                         </div>
                                     </div>
+                                    )}
 
-                                    {(paidAmount && parseFloat(paidAmount) < total) && (
+                                    {paymentSource !== "EXTERNAL" && (paidAmount && parseFloat(paidAmount) < total) && (
                                         <div className="animate-in fade-in slide-in-from-top-2 duration-300">
                                             <label className="block text-[10px] text-app-text-muted mb-1">Fecha Límite de Pago (Opcional)</label>
                                             <input
@@ -1052,12 +1096,14 @@ export default function PurchasesPage() {
                                         </div>
                                     )}
 
+                                    {paymentSource !== "EXTERNAL" && (
                                     <div className="flex items-center justify-between border-t border-app-border pt-4">
                                         <span className="text-app-text-muted font-medium text-sm">Restante / Deuda</span>
                                         <span className={`text-xl font-black ${parseFloat(paidAmount || "0") < total ? "text-rose-400" : "text-app-text-muted"}`}>
                                             {cop(Math.max(0, total - parseFloat(paidAmount || "0")))}
                                         </span>
                                     </div>
+                                    )}
                                 </div>
                                 <div className="flex items-center justify-between px-3 py-3 mt-1">
                                     <span className="text-app-text-muted font-medium text-sm">Total de la Compra</span>
@@ -1266,6 +1312,14 @@ export default function PurchasesPage() {
                                             </div>
 
                                             <div className="mt-4 flex justify-end gap-2">
+                                                {isCajero && user?.companyId === REPRINT_COMPANY_ID && (
+                                                    <button
+                                                        onClick={() => handlePrintPurchase(p)}
+                                                        className="px-4 py-2 bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 text-cyan-400 text-xs font-bold rounded-xl transition-all flex items-center gap-2"
+                                                    >
+                                                        <Printer size={14} /> Reimprimir
+                                                    </button>
+                                                )}
                                                 {view === "debts" && balance > 0 && p.status !== 'CANCELLED' && (
                                                     <button
                                                         onClick={() => setAbonoModal({ purchaseId: p.id, balance, supplierName: p.suppliers?.name || "" })}

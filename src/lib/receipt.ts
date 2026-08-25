@@ -134,3 +134,69 @@ export function printReceipt(
 export const PAPER_WIDTH_KEY = 'receipt_paper_width';
 
 export const getPaperWidth = () => Number(localStorage.getItem(PAPER_WIDTH_KEY) || 80);
+
+export interface PurchaseReceiptData {
+  purchaseId: string;
+  date: Date;
+  supplierName?: string | null;
+  items: { name: string; quantity: number; cost: number }[];
+  total: number;
+  paidAmount: number;
+  paymentMethod?: string | null;
+}
+
+export function printPurchaseReceipt(
+  header: ReceiptHeader | null,
+  d: PurchaseReceiptData,
+  paperWidthMm: number,
+): boolean {
+  const pw = `${paperWidthMm}mm`;
+  const ref = `ORD-${d.purchaseId.split('-')[0].toUpperCase()}`;
+  const PAY: Record<string, string> = { CASH: 'Efectivo', CARD: 'Tarjeta', TRANSFER: 'Transferencia', EXTERNAL: 'Pago externo' };
+  const balance = d.total - d.paidAmount;
+
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${ref}</title><style>
+    @page{size:${pw} auto;margin:0;}
+    *{margin:0;padding:0;box-sizing:border-box;}
+    body{font-family:'Courier New',monospace;font-size:12px;width:${pw};padding:3mm 2mm;}
+    .center{text-align:center;}.bold{font-weight:bold;}
+    .line{border-top:1px dashed #000;margin:5px 0;}
+    .row{display:flex;justify-content:space-between;gap:4px;}.row span:last-child{white-space:nowrap;text-align:right;flex-shrink:0;}
+    .total{font-size:14px;font-weight:bold;}.small{font-size:10px;}
+    .reprint{font-size:10px;text-align:center;border:1px solid #000;padding:2px;margin-top:4px;}
+    .logo{font-size:9px;text-align:center;margin-top:6px;opacity:0.5;}
+  </style></head><body>
+    <p class="center bold" style="font-size:15px;">${esc(header?.company_name ?? 'Mi Tienda')}</p>
+    <p class="center small">NIT ${esc(header?.document_number ?? 'No registrado')}</p>
+    <p class="center small bold">${esc(header?.branch_name ?? 'Sucursal')}</p>
+    ${header?.address ? `<p class="center small">${esc(header.address)}</p>` : ''}
+    ${header?.phone ? `<p class="center small">Tel. ${esc(header.phone)}</p>` : ''}
+    <div class="line"></div>
+    <p class="center bold">RECIBO DE COMPRA</p>
+    <p class="center small">${ref}</p>
+    <p class="center small">${d.date.toLocaleString('es-CO')}</p>
+    ${d.supplierName ? `<p class="center small">Proveedor: ${esc(d.supplierName)}</p>` : ''}
+    <div class="line"></div>
+    ${d.items.map(i => `
+      <div class="bold" style="font-size:11px;">${esc(i.name)}</div>
+      <div class="row small"><span>${i.quantity} x ${money(i.cost)}</span><span>${money(i.quantity * i.cost)}</span></div>
+    `).join('')}
+    <div class="line"></div>
+    <div class="row total"><span>TOTAL</span><span>${money(d.total)}</span></div>
+    <div class="row small"><span>Pagado</span><span>${money(d.paidAmount)}</span></div>
+    ${d.paymentMethod ? `<div class="row small"><span>Forma de pago</span><span>${esc(PAY[d.paymentMethod] ?? d.paymentMethod)}</span></div>` : ''}
+    ${balance > 0 ? `<div class="row small"><span>Saldo pendiente</span><span>${money(balance)}</span></div>` : ''}
+    <div class="line"></div>
+    <p class="reprint">COPIA — reimpresa ${new Date().toLocaleString('es-CO')}</p>
+    <p class="logo">— PUNTO360 —</p>
+  </body></html>`;
+
+  const win = window.open('', '_blank', `width=${paperWidthMm * 4},height=700`);
+  if (!win) return false;
+  win.onafterprint = () => win.close();
+  win.document.write(html);
+  win.document.close();
+  win.focus();
+  win.print();
+  return true;
+}
