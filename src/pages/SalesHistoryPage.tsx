@@ -43,7 +43,7 @@ export default function SalesHistoryPage() {
     const { hasPermission, user } = useAuth();
     const canViewFinancials = hasPermission("reports.view");
     const isCajero = !hasPermission("inventory.manage") && user?.role !== "ADMIN";
-    const isReprintOnlyCajero = isCajero && user?.companyId === '61f9fec7-468a-4574-a1f5-dd9b9d444eee';
+    const isReprintOnlyCajero = isCajero;
     const localDate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
     const today = localDate(new Date());
     const sevenDaysAgo = localDate(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000));

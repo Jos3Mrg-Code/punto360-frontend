@@ -53,7 +53,7 @@ export default function Sidebar({ isMobileOpen = false, onClose }: SidebarProps)
         { name: "Inventario", path: "/inventario", icon: Package, show: true },
         { name: "Importar", path: "/importar-productos", icon: FileUp, show: canManageProviders },
         { name: "Etiquetas", path: "/etiquetas", icon: Tag, show: canManageProviders || isCajero },
-        { name: "Historial", path: "/historial", icon: History, show: !isCajero || user?.companyId === '61f9fec7-468a-4574-a1f5-dd9b9d444eee' },
+        { name: "Historial", path: "/historial", icon: History, show: true },
         { name: "Cambios", path: "/cambios", icon: ArrowLeftRight, show: true },
         { name: "Consignaciones", path: "/consignaciones", icon: Handshake, show: true },
         { name: "Clientes", path: "/clientes", icon: Users, show: canManageCustomers || hasPermission('pos.access') },
