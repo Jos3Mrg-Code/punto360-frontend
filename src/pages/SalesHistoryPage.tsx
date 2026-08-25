@@ -43,6 +43,7 @@ export default function SalesHistoryPage() {
     const { hasPermission, user } = useAuth();
     const canViewFinancials = hasPermission("reports.view");
     const isCajero = !hasPermission("inventory.manage") && user?.role !== "ADMIN";
+    const isReprintOnlyCajero = isCajero && user?.companyId === '61f9fec7-468a-4574-a1f5-dd9b9d444eee';
     const localDate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
     const today = localDate(new Date());
     const sevenDaysAgo = localDate(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000));
@@ -390,7 +391,7 @@ export default function SalesHistoryPage() {
                                                                 >
                                                                     <Printer size={14} /> Reimprimir
                                                                 </button>
-                                                                {!isCancelled && (
+                                                                {!isCancelled && !isReprintOnlyCajero && (
                                                                     <button
                                                                         onClick={() => handleCancelSale(sale.id)}
                                                                         className="px-5 py-3 bg-rose-500 text-white font-black text-[10px] uppercase tracking-widest rounded-xl flex items-center gap-2 hover:bg-rose-600 transition-all shadow-xl shadow-rose-500/20 active:scale-95"
@@ -480,7 +481,7 @@ export default function SalesHistoryPage() {
                                         >
                                             <Printer size={13} /> Reimprimir Factura
                                         </button>
-                                        {!isCancelled && (
+                                        {!isCancelled && !isReprintOnlyCajero && (
                                             <button
                                                 onClick={() => handleCancelSale(sale.id)}
                                                 className="w-full mt-3 py-3 bg-rose-500 text-white font-black text-[9px] uppercase tracking-widest rounded-xl hover:bg-rose-600 transition-all shadow-lg active:scale-95"

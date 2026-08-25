@@ -843,10 +843,9 @@ export default function PurchasesPage() {
                 </div>
             )}
 
-            <div className={`grid grid-cols-1 gap-6 ${!(isCajero && user?.companyId === REPRINT_COMPANY_ID) ? 'xl:grid-cols-2' : ''}`}>
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
 
                 {/* ── PANEL IZQUIERDO: Formulario ── */}
-                {!(isCajero && user?.companyId === REPRINT_COMPANY_ID) && (
                 <div className="bg-app-card border border-app-border rounded-2xl backdrop-blur-md shadow-xl overflow-hidden">
                     <div className="px-6 py-4 border-b border-app-border flex items-center gap-2">
                         <Truck size={16} className="text-violet-400" />
@@ -1138,7 +1137,6 @@ export default function PurchasesPage() {
                         )}
                     </div>
                 </div>
-                )}
 
                 {/* ── PANEL DERECHO: Historial ── */}
                 <div className="bg-app-card border border-app-border rounded-2xl backdrop-blur-md shadow-xl overflow-hidden flex flex-col">
