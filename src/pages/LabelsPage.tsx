@@ -159,8 +159,19 @@ async function getQZ() {
 
 async function connectQZ(qz: any): Promise<void> {
     if (qz.websocket.isActive()) return;
-    qz.security.setCertificatePromise((resolve: any) => resolve(""));
-    qz.security.setSignaturePromise(() => (resolve: any) => resolve(""));
+
+    qz.security.setCertificatePromise((resolve: any, reject: any) =>
+        api.post("/qz/certificate")
+            .then((r: any) => resolve(r.data.certificate))
+            .catch(reject)
+    );
+
+    qz.security.setSignaturePromise((toSign: string) => (resolve: any, reject: any) =>
+        api.post("/qz/sign", { request: toSign })
+            .then((r: any) => resolve(r.data.signature))
+            .catch(reject)
+    );
+
     await Promise.race([
         qz.websocket.connect({ retries: 0, delay: 0 }),
         new Promise((_, reject) =>
