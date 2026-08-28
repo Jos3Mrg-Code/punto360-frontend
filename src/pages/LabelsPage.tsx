@@ -26,6 +26,8 @@ interface LabelConfig {
     gapMm?: number;
     /** Gap horizontal entre columnas en TSPL, en mm. 0 = etiquetas pegadas. */
     columnGapMm?: number;
+    /** Desplazamiento horizontal de todo el contenido en TSPL (dots). Positivo = hacia la derecha. */
+    offsetXDots?: number;
     dpi: 203 | 300;
 }
 
@@ -295,10 +297,11 @@ function buildTSPL(products: LabelProduct[], config: LabelConfig): string {
     const DPI  = config.dpi ?? 203;
     const dots = (mm: number) => Math.round(mm * DPI / 25.4);
 
-    const labelW = dots(config.labelWidthMm);
-    const labelH = dots(config.labelHeightMm);
-    const cols   = config.columns;
-    const colGap = dots(config.columnGapMm ?? 0);
+    const labelW  = dots(config.labelWidthMm);
+    const labelH  = dots(config.labelHeightMm);
+    const cols    = config.columns;
+    const colGap  = dots(config.columnGapMm ?? 0);
+    const offsetX = config.offsetXDots ?? 0;
 
     const margin  = Math.max(4, dots(config.marginMm));
     const gap     = 3;
@@ -374,7 +377,7 @@ function buildTSPL(products: LabelProduct[], config: LabelConfig): string {
 
         for (let c = 0; c < row.length; c++) {
             const p    = row[c];
-            const colX = (labelW + colGap) * c;
+            const colX = (labelW + colGap) * c + offsetX;
             const bv   = stripAccents(p.barcode || p.sku)
                 .replace(/[^A-Za-z0-9\-\. \$\/\+\%]/g, "").trim();
 
@@ -920,6 +923,7 @@ export default function LabelsPage() {
                                             Si la etiqueta sale en blanco o con los comandos impresos como texto, el lenguaje no coincide con la impresora.
                                         </p>
                                         {config.printerLang === "tspl" && (
+                                            <>
                                             <div className="mt-3 flex items-center gap-2">
                                                 <label className="text-xs text-app-text-muted">Separación entre etiquetas</label>
                                                 <input
@@ -930,6 +934,17 @@ export default function LabelsPage() {
                                                 />
                                                 <span className="text-xs text-app-text-muted">mm</span>
                                             </div>
+                                            <div className="mt-2 flex items-center gap-2">
+                                                <label className="text-xs text-app-text-muted">Ajuste horizontal (offset X)</label>
+                                                <input
+                                                    type="number" min={-50} max={50} step={1}
+                                                    value={config.offsetXDots ?? 0}
+                                                    onChange={e => setCfg("offsetXDots", Number(e.target.value))}
+                                                    className="w-20 bg-app-bg border border-app-border rounded-lg px-2 py-1 text-app-text text-sm text-center focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+                                                />
+                                                <span className="text-xs text-app-text-muted">dots (− izq / + der)</span>
+                                            </div>
+                                            </>
                                         )}
                                     </div>
                                 )}
