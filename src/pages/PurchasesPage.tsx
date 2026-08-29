@@ -84,6 +84,7 @@ const variantLabel = (v: VariantOption) =>
 export default function PurchasesPage() {
     const { hasPermission, user } = useAuth();
     const isCajero = user?.role === 'CAJERO' || (!hasPermission('purchases.manage') && !hasPermission('inventory.manage'));
+    const canEditPurchases = ['ADMIN', 'SUPERADMIN'].includes((user?.role ?? '').toUpperCase()) || hasPermission('purchases.edit');
 
     // ── Suppliers state ────────────────────────────────────────────────────────
     const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -1328,7 +1329,7 @@ export default function PurchasesPage() {
                                                         <CheckCircle2 size={14} /> Registrar Abono
                                                     </button>
                                                 )}
-                                                {!isCajero && p.status !== 'CANCELLED' && (
+                                                {canEditPurchases && p.status !== 'CANCELLED' && (
                                                     <button
                                                         onClick={() => setCancelConfirm(p.id)}
                                                         className="px-4 py-2 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-400 text-xs font-bold rounded-xl transition-all flex items-center gap-2"

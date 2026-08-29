@@ -2,10 +2,12 @@ import { toast } from "../lib/toast";
 import { useEffect, useState } from "react";
 import DashboardLayout from "../layouts/DashboardLayout";
 import { api } from "../api/axios";
+import { useAuth } from "../auth/AuthContext";
+import EditPurchaseModal, { type EditablePurchase } from "../components/purchases/EditPurchaseModal";
 import {
     Truck, Phone, Mail, Package, ChevronDown, ChevronUp,
     AlertCircle, CheckCircle2, Clock, Search, Edit2, X,
-    CreditCard, Banknote, ArrowLeftRight, Plus
+    CreditCard, Banknote, ArrowLeftRight, Plus, Ban, AlertTriangle, Loader2
 } from "lucide-react";
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -33,9 +35,20 @@ interface PurchasePayment {
 
 interface PurchaseItem {
     id: string;
+    product_id: string | null;
+    variant_id: string | null;
     quantity: number;
     cost: number;
-    products: { name: string; sku: string; unit_type: string };
+    products: {
+        id?: string;
+        name: string;
+        sku: string;
+        unit_type: string;
+        has_variants?: boolean;
+        sale_price?: number;
+        cost_price?: number;
+    } | null;
+    variants?: { id: string; sku: string; sale_price?: number; cost_price?: number } | null;
 }
 
 interface SupplierPurchase {
@@ -74,6 +87,7 @@ const StatusBadge = ({ status }: { status: string }) => {
         PAID:    { label: "Pagado",   cls: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30", Icon: CheckCircle2 },
         PARTIAL: { label: "Parcial",  cls: "bg-amber-500/15 text-amber-400 border-amber-500/30",     Icon: Clock },
         PENDING: { label: "Pendiente",cls: "bg-rose-500/15 text-rose-400 border-rose-500/30",         Icon: AlertCircle },
+        CANCELLED: { label: "Anulada",cls: "bg-app-border/40 text-app-text-muted border-app-border",  Icon: Ban },
     };
     const { label, cls, Icon } = map[status] ?? map.PENDING;
     return (
@@ -86,6 +100,11 @@ const StatusBadge = ({ status }: { status: string }) => {
 // ── Main Component ────────────────────────────────────────────────────────────
 
 export default function SuppliersPage() {
+    const { user, hasPermission } = useAuth();
+    const role = user?.role?.toUpperCase();
+    const canEditPurchases =
+        role === "ADMIN" || role === "SUPERADMIN" || hasPermission("purchases.edit");
+
     const [suppliers, setSuppliers] = useState<SupplierStat[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [search, setSearch] = useState("");
@@ -106,6 +125,36 @@ export default function SuppliersPage() {
     const [payAmount, setPayAmount] = useState("");
     const [payMethod, setPayMethod] = useState("CASH");
     const [isSubmittingPay, setIsSubmittingPay] = useState(false);
+
+    // Edit / cancel purchase
+    const [editingPurchase, setEditingPurchase] = useState<SupplierPurchase | null>(null);
+    const [cancelId, setCancelId] = useState<string | null>(null);
+    const [isCancelling, setIsCancelling] = useState(false);
+
+    const reloadAfterChange = async () => {
+        if (!selected) return;
+        const [purchasesRes] = await Promise.all([
+            api.get(`/suppliers/${selected.id}/purchases`),
+            loadSuppliers(),
+        ]);
+        setPurchases(purchasesRes.data);
+    };
+
+    const handleCancelPurchase = async () => {
+        if (!cancelId) return;
+        setIsCancelling(true);
+        try {
+            await api.delete(`/purchases/${cancelId}`);
+            toast.success("Factura anulada. Stock, caja y cartera revertidos.");
+            setCancelId(null);
+            setExpandedId(null);
+            await reloadAfterChange();
+        } catch (e: any) {
+            toast.error(e?.response?.data?.message ?? "Error al anular la factura");
+        } finally {
+            setIsCancelling(false);
+        }
+    };
 
     // ── Load suppliers ──────────────────────────────────────────────────────
 
@@ -462,13 +511,15 @@ export default function SuppliersPage() {
                                                                     {p.purchase_items.map(item => (
                                                                         <tr key={item.id}>
                                                                             <td className="px-3 py-2">
-                                                                                <p className="font-bold text-app-text">{item.products.name}</p>
-                                                                                <p className="text-[9px] text-app-text-muted font-mono">{item.products.sku}</p>
+                                                                                <p className="font-bold text-app-text">{item.products?.name ?? "Producto"}</p>
+                                                                                <p className="text-[9px] text-app-text-muted font-mono">
+                                                                                    {item.variants?.sku ?? item.products?.sku ?? "—"}
+                                                                                </p>
                                                                             </td>
                                                                             <td className="px-3 py-2 text-center text-app-text font-bold">
                                                                                 {Number(item.quantity).toLocaleString()}
                                                                                 <span className="text-[9px] text-app-text-muted ml-0.5">
-                                                                                    {item.products.unit_type === "WEIGHT" ? "Kg" : "Un"}
+                                                                                    {item.products?.unit_type === "WEIGHT" ? "Kg" : "Un"}
                                                                                 </span>
                                                                             </td>
                                                                             <td className="px-3 py-2 text-right text-app-text">{cop(Number(item.cost))}</td>
@@ -530,13 +581,31 @@ export default function SuppliersPage() {
                                                     </div>
 
                                                     {/* Register payment button */}
-                                                    {p.status !== "PAID" && (
+                                                    {p.status !== "PAID" && p.status !== "CANCELLED" && (
                                                         <button
                                                             onClick={() => openPayment(p.id, balance)}
                                                             className="w-full py-2.5 rounded-xl bg-violet-500/10 hover:bg-violet-500/20 text-violet-400 font-black text-xs border border-violet-500/30 transition-all flex items-center justify-center gap-2"
                                                         >
                                                             <Plus size={14} /> REGISTRAR ABONO
                                                         </button>
+                                                    )}
+
+                                                    {/* Admin actions */}
+                                                    {canEditPurchases && p.status !== "CANCELLED" && (
+                                                        <div className="flex gap-2">
+                                                            <button
+                                                                onClick={() => setEditingPurchase(p)}
+                                                                className="flex-1 py-2.5 rounded-xl bg-app-bg hover:bg-app-border/40 text-app-text font-black text-xs border border-app-border transition-all flex items-center justify-center gap-2"
+                                                            >
+                                                                <Edit2 size={13} /> EDITAR FACTURA
+                                                            </button>
+                                                            <button
+                                                                onClick={() => setCancelId(p.id)}
+                                                                className="flex-1 py-2.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 font-black text-xs border border-rose-500/30 transition-all flex items-center justify-center gap-2"
+                                                            >
+                                                                <Ban size={13} /> ANULAR FACTURA
+                                                            </button>
+                                                        </div>
                                                     )}
                                                 </div>
                                             )}
@@ -673,6 +742,53 @@ export default function SuppliersPage() {
                                 {isSubmittingPay ? "Registrando..." : <>
                                     <Plus size={15} /> Registrar Abono
                                 </>}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Edit Purchase Modal ─────────────────────────────────────── */}
+            {editingPurchase && (
+                <EditPurchaseModal
+                    purchase={editingPurchase satisfies EditablePurchase}
+                    supplierId={selected?.id ?? ""}
+                    onClose={() => setEditingPurchase(null)}
+                    onSaved={async () => {
+                        setEditingPurchase(null);
+                        setExpandedId(null);
+                        await reloadAfterChange();
+                    }}
+                />
+            )}
+
+            {/* ── Cancel Purchase Confirm ─────────────────────────────────── */}
+            {cancelId && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-app-bg/80 backdrop-blur-sm" onClick={() => setCancelId(null)} />
+                    <div className="relative w-full max-w-sm bg-app-card border border-rose-500/30 rounded-2xl shadow-2xl p-6 flex flex-col gap-5">
+                        <div className="flex items-start gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-rose-500/20 flex items-center justify-center shrink-0">
+                                <AlertTriangle size={20} className="text-rose-400" />
+                            </div>
+                            <div>
+                                <h3 className="font-black text-app-text text-lg">Anular factura</h3>
+                                <p className="text-sm text-app-text-muted mt-1">
+                                    Se revertirá el stock recibido y los movimientos de caja o cartera asociados. No se puede deshacer.
+                                </p>
+                            </div>
+                        </div>
+                        <div className="flex gap-3">
+                            <button onClick={() => setCancelId(null)} className="flex-1 py-2.5 rounded-xl border border-app-border text-app-text-muted text-sm font-bold hover:text-app-text transition-colors">
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={handleCancelPurchase}
+                                disabled={isCancelling}
+                                className="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-black text-sm transition-colors flex items-center justify-center gap-2 disabled:opacity-40"
+                            >
+                                {isCancelling ? <Loader2 size={15} className="animate-spin" /> : <Ban size={15} />}
+                                Anular
                             </button>
                         </div>
                     </div>
