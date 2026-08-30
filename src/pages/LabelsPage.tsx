@@ -3,7 +3,7 @@ import { useLocation } from "react-router-dom";
 import DashboardLayout from "../layouts/DashboardLayout";
 import { api } from "../api/axios";
 import JsBarcode from "jsbarcode";
-import { Tag, Settings, Printer, Search, Plus, Trash2, Save, CheckCircle2, Wifi, WifiOff, ChevronDown, ExternalLink, Clock, X, PrinterCheck } from "lucide-react";
+import { Tag, Settings, Printer, Search, Plus, Trash2, Save, CheckCircle2, Wifi, WifiOff, ChevronDown, ExternalLink, Clock, X, PrinterCheck, ZoomIn, ZoomOut, RefreshCw } from "lucide-react";
 import { toast } from "../lib/toast";
 import { stripAccents, shortVariantCode } from "../utils/skuUtils";
 
@@ -17,6 +17,7 @@ interface LabelConfig {
     showSku: boolean;
     showPrice: boolean;
     showBarcode: boolean;
+    showVariant: boolean;
     printerName: string;
     printMode: "zpl" | "browser";
     /** Lenguaje de la impresora termica. Zebra habla ZPL; TSC, Jaltech y
@@ -41,6 +42,7 @@ const DEFAULT_CONFIG: LabelConfig = {
     showSku: true,
     showPrice: true,
     showBarcode: true,
+    showVariant: true,
     printerName: "",
     printMode: "browser",
     printerLang: "zpl",
@@ -60,10 +62,14 @@ const PRESETS = [
 interface LabelProduct {
     id: string; name: string; sku: string;
     sale_price: number; barcode?: string | null; quantity: number;
+    /** Descripción legible de la variante, ej. "NEGRO / 35". Vacío si el producto no tiene variantes. */
+    variant?: string;
 }
 interface ProductVariant {
     id: string; sku: string; barcode?: string | null;
     sale_price?: number | null; stockCount: number;
+    /** Etiqueta legible de los atributos de la variante, ej. "NEGRO / 35" */
+    variantLabel?: string;
 }
 interface Product {
     id: string; name: string; sku: string;
@@ -124,8 +130,10 @@ function buildLabelHtml(products: LabelProduct[], config: LabelConfig, autoPrint
     const body = rows.map(row => `<div class="row">${
         row.map(p => {
             const bv = (p.barcode || p.sku).replace(/[<>&"]/g, c => ({ "<":"&lt;",">":"&gt;","&":"&amp;",'"':"&quot;" }[c]!));
+            const variant = (p.variant || "").replace(/[<>&"]/g, c => ({ "<":"&lt;",">":"&gt;","&":"&amp;",'"':"&quot;" }[c]!));
             return `<div class="label"><div class="inner">${
                 config.showName    ? `<p class="name">${p.name}</p>`  : ""
+            }${config.showVariant && variant ? `<p class="variant">${variant}</p>` : ""
             }${config.showBarcode  ? renderBc(bv)                     : ""
             }${config.showSku      ? `<p class="sku">${p.sku}</p>`    : ""
             }${config.showPrice    ? `<p class="price">${COP(p.sale_price)}</p>` : ""
@@ -133,8 +141,9 @@ function buildLabelHtml(products: LabelProduct[], config: LabelConfig, autoPrint
         }).join("")
     }</div>`).join("");
 
-    const namePt  = Math.max(7,  Math.round(hIn * 72 * 0.12));
-    const skuPt   = Math.max(5,  Math.round(hIn * 72 * 0.07));
+    const namePt   = Math.max(7,  Math.round(hIn * 72 * 0.12));
+    const variantPt = Math.max(6, Math.round(hIn * 72 * 0.09));
+    const skuPt    = Math.max(5,  Math.round(hIn * 72 * 0.07));
     const pricePt = Math.max(7,  Math.round(hIn * 72 * 0.11));
     const printScript = autoPrint ? `<script>setTimeout(function(){window.print();},300);</script>` : "";
 
@@ -148,6 +157,7 @@ html,body{margin:0;padding:0;background:white;font-family:Arial,sans-serif;width
 .label{display:table;width:${wIn}in;height:${hIn}in;overflow:hidden;}
 .inner{display:table-cell;vertical-align:middle;text-align:center;padding:${padIn}in;}
 .name{font-size:${namePt}pt;font-weight:bold;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-transform:uppercase;display:block;}
+.variant{font-size:${variantPt}pt;font-weight:bold;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-transform:uppercase;display:block;}
 .sku{font-size:${skuPt}pt;color:#333;font-weight:bold;display:block;}
 .price{font-size:${pricePt}pt;font-weight:bold;display:block;}
 </style></head><body>${body}${printScript}</body></html>`;
@@ -207,6 +217,8 @@ function buildZPL(products: LabelProduct[], config: LabelConfig): string {
     // Font heights scaled to label height, capped so text never dominates the barcode
     const nameH  = Math.max(18, Math.min(Math.round(labelH * 0.14), 24));
     const nameW  = Math.max(14, Math.round(nameH * 0.85));
+    const varH   = Math.max(15, Math.min(Math.round(labelH * 0.12), 20));
+    const varW   = Math.max(12, Math.round(varH * 0.85));
     const priceH = Math.max(18, Math.min(Math.round(labelH * 0.16), 26));
     const priceW = Math.max(14, Math.round(priceH * 0.85));
     const skuH   = Math.max(13, Math.min(Math.round(labelH * 0.11), 17));
@@ -215,10 +227,12 @@ function buildZPL(products: LabelProduct[], config: LabelConfig): string {
     const nameSlot  = config.showName    ? nameH  + gap : 0;
     const skuSlot   = config.showSku     ? skuH   + gap : 0;
     const priceSlot = config.showPrice   ? priceH + gap : 0;
+    const hasVariant = (p: LabelProduct) => config.showVariant && !!(p.variant && p.variant.trim());
+    const varSlot   = varH + gap;
 
     // Barcode bars get whatever vertical space remains after text rows
-    const bcH = config.showBarcode
-        ? Math.max(30, labelH - vMargin * 2 - nameSlot - skuSlot - priceSlot)
+    const bcHFor = (p: LabelProduct) => config.showBarcode
+        ? Math.max(30, labelH - vMargin * 2 - nameSlot - (hasVariant(p) ? varSlot : 0) - skuSlot - priceSlot)
         : 0;
 
     // Code128B data modules: start(11) + N×char(11) + check(11) + stop(13) = N×11 + 35
@@ -252,8 +266,16 @@ function buildZPL(products: LabelProduct[], config: LabelConfig): string {
                 y += nameSlot;
             }
 
+            // 1b. Variante — ej. "NEGRO / 35"
+            if (hasVariant(p)) {
+                const variant = stripAccents(p.variant!).substring(0, 24).toUpperCase();
+                zpl += `^FO${colX + margin},${y}^A0N,${varH},${varW}^FB${innerW},1,0,C^FD${variant}^FS`;
+                y += varSlot;
+            }
+
             // 2. Código de barras — BY1, centrado garantizando QZ ≥ 51 dots cada lado
             if (config.showBarcode && bv) {
+                const bcH = bcHFor(p);
                 const bw  = bcDots(bv);
                 const bcX = colX + Math.max(QZ, Math.floor((labelW - bw) / 2));
                 zpl += `^FO${bcX},${y}^BY1,2,${bcH}^BCN,,N,N^FD${bv}^FS`;
@@ -316,6 +338,7 @@ function buildTSPL(products: LabelProduct[], config: LabelConfig): string {
     const priceMul = mulFor(Math.max(18, Math.min(Math.round(labelH * 0.16), 26)));
     const skuMul   = mulFor(Math.max(13, Math.min(Math.round(labelH * 0.11), 17)));
 
+    const variantMul = 1;
     const hOf = (mul: number) => BASE_H * mul;
     const skuSlot   = config.showSku   ? hOf(skuMul)   + gap : 0;
     const priceSlot = config.showPrice ? hOf(priceMul) + gap : 0;
@@ -385,12 +408,17 @@ function buildTSPL(products: LabelProduct[], config: LabelConfig): string {
                 ? wrapWords(stripAccents(p.name).toUpperCase(), charsPerLine, 2)
                 : [];
             const nameSlot = nameLines.length * (hOf(nameMul) + gap);
+            const showVariant = config.showVariant && !!(p.variant && p.variant.trim());
+            const variantText = showVariant
+                ? stripAccents(p.variant!).toUpperCase().slice(0, charsPerLine)
+                : "";
+            const variantSlot = showVariant ? hOf(variantMul) + gap : 0;
             const bcH = config.showBarcode
-                ? Math.max(25, Math.min(55, labelH - vMargin * 2 - nameSlot - skuSlot - priceSlot))
+                ? Math.max(25, Math.min(55, labelH - vMargin * 2 - nameSlot - variantSlot - skuSlot - priceSlot))
                 : 0;
 
             // Centrado vertical: calcular altura total del contenido y arrancar desde el centro
-            const totalContentH = nameSlot + (config.showBarcode && bv ? bcH + gap : 0) + skuSlot + priceSlot;
+            const totalContentH = nameSlot + variantSlot + (config.showBarcode && bv ? bcH + gap : 0) + skuSlot + priceSlot;
             let y = Math.max(vMargin, Math.floor((labelH - totalContentH) / 2));
 
             if (config.showName) {
@@ -398,6 +426,11 @@ function buildTSPL(products: LabelProduct[], config: LabelConfig): string {
                     out += `TEXT ${centerX(colX, line, nameMul)},${y},"0",0,${nameMul},${nameMul},"${esc(line)}"\n`;
                     y += hOf(nameMul) + gap;
                 }
+            }
+
+            if (showVariant) {
+                out += `TEXT ${centerX(colX, variantText, variantMul)},${y},"0",0,${variantMul},${variantMul},"${esc(variantText)}"\n`;
+                y += variantSlot;
             }
 
             if (config.showBarcode && bv) {
@@ -460,9 +493,24 @@ function LabelCard({ product, config, scale = 3 }: { product: LabelProduct; conf
         <div style={{ width: w, height: h, padding: pad, boxSizing: "border-box" }}
             className="bg-white border border-gray-300 flex flex-col items-center justify-start overflow-hidden shrink-0 gap-0.5">
             {config.showName && <p style={{ fontSize: Math.max(6, h * 0.08), margin: 0, fontWeight: "bold", textAlign: "center", lineHeight: 1.1, maxWidth: "100%", overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>{product.name}</p>}
+            {config.showVariant && product.variant && <p style={{ fontSize: Math.max(6, h * 0.07), margin: 0, fontWeight: "bold", textAlign: "center", lineHeight: 1.1, maxWidth: "100%", overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis", textTransform: "uppercase" }}>{product.variant}</p>}
             {config.showBarcode && <div style={{ maxWidth: "100%", lineHeight: 0, flex: 1 }}><BarcodePreview value={bv} height={Math.floor(h * 0.42)} /></div>}
             {config.showSku && <p style={{ fontSize: Math.max(5, h * 0.065), margin: 0, color: "#333", textAlign: "center", fontWeight: "bold" }}>{product.sku}</p>}
             {config.showPrice && <p style={{ fontSize: Math.max(7, h * 0.09), margin: 0, fontWeight: "bold", textAlign: "center" }}>{COP(product.sale_price)}</p>}
+        </div>
+    );
+}
+
+function ZoomControls({ zoom, onIn, onOut, onReset }: { zoom: number; onIn: () => void; onOut: () => void; onReset: () => void }) {
+    const btn = "p-1.5 rounded-lg border border-app-border text-app-text-muted hover:text-app-text hover:border-violet-500/40 transition-colors disabled:opacity-40 disabled:cursor-not-allowed";
+    return (
+        <div className="flex items-center gap-1.5">
+            <button onClick={onOut} disabled={zoom <= 0.5} className={btn} title="Alejar"><ZoomOut size={14} /></button>
+            <button onClick={onReset} className="text-xs font-bold text-app-text-muted hover:text-app-text w-12 text-center tabular-nums" title="Restablecer zoom">
+                {Math.round(zoom * 100)}%
+            </button>
+            <button onClick={onIn} disabled={zoom >= 4} className={btn} title="Acercar"><ZoomIn size={14} /></button>
+            <button onClick={onReset} className={btn} title="Restablecer zoom"><RefreshCw size={13} /></button>
         </div>
     );
 }
@@ -480,6 +528,13 @@ export default function LabelsPage() {
     });
 
     const [saved, setSaved] = useState(false);
+
+    // Zoom de la vista previa (multiplica la escala base de la etiqueta)
+    const [previewZoom, setPreviewZoom] = useState(1);
+    const ZOOM_MIN = 0.5, ZOOM_MAX = 4, ZOOM_STEP = 0.25;
+    const zoomIn    = () => setPreviewZoom(z => Math.min(ZOOM_MAX, +(z + ZOOM_STEP).toFixed(2)));
+    const zoomOut   = () => setPreviewZoom(z => Math.max(ZOOM_MIN, +(z - ZOOM_STEP).toFixed(2)));
+    const zoomReset = () => setPreviewZoom(1);
 
     const setCfg = useCallback(<K extends keyof LabelConfig>(key: K, value: LabelConfig[K]) =>
         setConfig(prev => ({ ...prev, [key]: value })), []);
@@ -605,6 +660,10 @@ export default function LabelsPage() {
                 barcode: v.barcode ?? null,
                 sale_price: v.sale_price ? Number(v.sale_price) : null,
                 stockCount: (v.stock ?? []).reduce((s: number, x: any) => s + Number(x.quantity), 0),
+                variantLabel: (v.values ?? [])
+                    .map((x: any) => x?.attribute_value?.value)
+                    .filter(Boolean)
+                    .join(" / "),
             }));
             const stock = p.has_variants
                 ? variants.reduce((s, v) => s + v.stockCount, 0)
@@ -647,6 +706,7 @@ export default function LabelsPage() {
                     sale_price: v.sale_price ?? p.sale_price,
                     barcode: null,
                     quantity: v.stockCount,
+                    variant: v.variantLabel || "",
                 }));
         }
         return [{ id: p.id, name: p.name, sku: p.sku, sale_price: p.sale_price, barcode: p.barcode, quantity: Math.max(1, p.stockCount) }];
@@ -850,25 +910,29 @@ export default function LabelsPage() {
                         </div>
 
                         <div className="xl:col-span-2 bg-app-card border border-app-border rounded-2xl p-5">
-                            <h2 className="text-xs font-bold text-app-text-muted uppercase tracking-widest mb-4">Vista previa</h2>
+                            <div className="flex items-center justify-between mb-4">
+                                <h2 className="text-xs font-bold text-app-text-muted uppercase tracking-widest">Vista previa</h2>
+                                {labelProducts.length > 0 && <ZoomControls zoom={previewZoom} onIn={zoomIn} onOut={zoomOut} onReset={zoomReset} />}
+                            </div>
                             {labelProducts.length === 0 ? (
                                 <div className="flex items-center justify-center h-64 text-app-text-muted">
                                     <div className="text-center"><Tag size={48} className="mx-auto mb-3 opacity-10" /><p className="text-sm">Las etiquetas aparecerán aquí</p></div>
                                 </div>
                             ) : (
-                                <div className="overflow-x-auto">
+                                <div className="overflow-auto max-h-[70vh]">
                                     <div className="inline-flex flex-col border border-gray-600 bg-gray-100">
                                         {(() => {
                                             const exp: LabelProduct[] = [];
                                             for (const p of labelProducts) for (let i = 0; i < Math.min(p.quantity, 6); i++) exp.push(p);
                                             const rows: LabelProduct[][] = [];
                                             for (let i = 0; i < exp.slice(0, 12).length; i += config.columns) rows.push(exp.slice(i, i + config.columns));
+                                            const s = 2.5 * previewZoom;
                                             return rows.map((row, ri) => (
                                                 <div key={ri} className="flex">
                                                     {Array.from({ length: config.columns }).map((_, ci) => (
                                                         row[ci]
-                                                            ? <LabelCard key={ci} product={row[ci]} config={config} scale={2.5} />
-                                                            : <div key={ci} style={{ width: config.labelWidthMm * 2.5, height: config.labelHeightMm * 2.5 }} className="bg-gray-50 border border-dashed border-gray-300" />
+                                                            ? <LabelCard key={ci} product={row[ci]} config={config} scale={s} />
+                                                            : <div key={ci} style={{ width: config.labelWidthMm * s, height: config.labelHeightMm * s }} className="bg-gray-50 border border-dashed border-gray-300" />
                                                     ))}
                                                 </div>
                                             ));
@@ -1133,6 +1197,7 @@ export default function LabelsPage() {
                                         { key: "showName" as const,    label: "Nombre" },
                                         { key: "showSku" as const,     label: "SKU" },
                                         { key: "showPrice" as const,   label: "Precio" },
+                                        { key: "showVariant" as const, label: "Variante" },
                                     ]).map(({ key, label }) => (
                                         <button key={key} onClick={() => setCfg(key, !config[key])}
                                             className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-sm font-medium transition-all ${config[key] ? "bg-violet-600/20 border-violet-500/40 text-violet-300" : "border-app-border text-app-text-muted"}`}>
@@ -1160,9 +1225,12 @@ export default function LabelsPage() {
 
                         {/* Preview */}
                         <div className="bg-app-card border border-app-border rounded-2xl p-6 flex flex-col gap-4">
-                            <p className="text-xs font-bold text-app-text-muted uppercase tracking-widest">Previa de etiqueta</p>
-                            <div className="flex items-center justify-center flex-1 min-h-48 bg-app-bg rounded-xl border border-app-border">
-                                <LabelCard product={{ id: "p", name: "Nombre del Producto", sku: "SKU-001", sale_price: 15000, barcode: "7702116001022", quantity: 1 }} config={config} scale={3} />
+                            <div className="flex items-center justify-between">
+                                <p className="text-xs font-bold text-app-text-muted uppercase tracking-widest">Previa de etiqueta</p>
+                                <ZoomControls zoom={previewZoom} onIn={zoomIn} onOut={zoomOut} onReset={zoomReset} />
+                            </div>
+                            <div className="flex items-center justify-center flex-1 min-h-48 max-h-[70vh] bg-app-bg rounded-xl border border-app-border overflow-auto p-4">
+                                <LabelCard product={{ id: "p", name: "Nombre del Producto", sku: "SKU-001", sale_price: 15000, barcode: "7702116001022", quantity: 1, variant: "Negro / 35" }} config={config} scale={3 * previewZoom} />
                             </div>
                             <div className="grid grid-cols-2 gap-2 text-xs">
                                 {[
