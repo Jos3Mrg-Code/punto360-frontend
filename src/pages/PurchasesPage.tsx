@@ -12,7 +12,7 @@ import { printPurchaseReceipt, getPaperWidth, type ReceiptHeader } from "../lib/
 import NewProductFields, { type SavedProduct } from "../components/products/NewProductFields";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
-interface Supplier { id: string; name: string; phone?: string; }
+interface Supplier { id: string; name: string; phone?: string; creditBalance?: number; }
 interface VariantOption {
     id: string;
     sku: string;
@@ -134,7 +134,7 @@ export default function PurchasesPage() {
     // ── Payment state ──────────────────────────────────────────────────────────
     const [paidAmount, setPaidAmount] = useState<string>("");
     const [paymentMethod, setPaymentMethod] = useState("CASH");
-    const [paymentSource, setPaymentSource] = useState<"CASH" | "CARTERA" | "EXTERNAL">("CASH");
+    const [paymentSource, setPaymentSource] = useState<"CASH" | "CARTERA" | "EXTERNAL" | "CREDIT">("CASH");
 
     // ── Receipt info (para reimprimir compras) ─────────────────────────────────
     const [receiptInfo, setReceiptInfo] = useState<ReceiptHeader | null>(null);
@@ -462,6 +462,17 @@ export default function PurchasesPage() {
 
     const total = useMemo(() => items.reduce((sum, i) => sum + (i.quantity * i.cost), 0), [items]);
 
+    const supplierCredit = useMemo(
+        () => suppliers.find(s => s.id === selectedSupplier)?.creditBalance ?? 0,
+        [suppliers, selectedSupplier],
+    );
+    const creditApplied = Math.min(total, supplierCredit);
+
+    // Si el proveedor cambia y ya no hay saldo a favor, volver a CASH
+    useEffect(() => {
+        if (paymentSource === "CREDIT" && supplierCredit <= 0) setPaymentSource("CASH");
+    }, [supplierCredit, paymentSource]);
+
     const visiblePurchases = useMemo(() => {
         if (!selectedSupplier) return purchases;
         return purchases.filter(p => p.supplier_id === selectedSupplier);
@@ -490,6 +501,12 @@ export default function PurchasesPage() {
     const handleSubmit = async () => {
         if (items.length === 0) return toast.error("Agrega al menos un producto.");
         if (items.some(i => i.quantity <= 0 || i.cost < 0)) return toast.error("Revisa las cantidades y costos.");
+        if (paymentSource === "CREDIT" && !selectedSupplier) return toast.error("Selecciona el proveedor del saldo a favor.");
+
+        const paidAmountValue =
+            paymentSource === "EXTERNAL" ? total
+            : paymentSource === "CREDIT" ? creditApplied
+            : (paidAmount ? parseFloat(paidAmount) : total);
 
         setIsSubmitting(true);
         try {
@@ -503,7 +520,7 @@ export default function PurchasesPage() {
                     salePrice: Number(i.salePrice) || undefined,
                 })),
                 total,
-                paidAmount: paymentSource === 'EXTERNAL' ? total : (paidAmount ? parseFloat(paidAmount) : total),
+                paidAmount: paidAmountValue,
                 paymentMethod: paymentSource === 'CARTERA' ? 'CASH' : paymentMethod,
                 paymentSource,
                 dueDate: paymentSource === 'EXTERNAL' ? undefined : (dueDate || undefined),
@@ -1051,13 +1068,27 @@ export default function PurchasesPage() {
                                             >
                                                 Ya pagada
                                             </button>
+                                            {supplierCredit > 0 && (
+                                                <button
+                                                    onClick={() => { setPaymentSource("CREDIT"); setPaidAmount(String(Math.round(Math.min(total, supplierCredit)))); }}
+                                                    className={`flex-1 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider transition-all ${paymentSource === "CREDIT" ? "bg-emerald-600 text-white" : "text-app-text-muted hover:text-app-text"}`}
+                                                >
+                                                    Saldo a favor
+                                                </button>
+                                            )}
                                         </div>
                                         {paymentSource === "EXTERNAL" && (
                                             <p className="text-[10px] text-emerald-400 mt-1.5">Factura ya cancelada — no afecta caja ni cartera.</p>
                                         )}
+                                        {paymentSource === "CREDIT" && (
+                                            <p className="text-[10px] text-emerald-400 mt-1.5">
+                                                Saldo a favor disponible: {cop(supplierCredit)}. Se aplicará {cop(creditApplied)}
+                                                {creditApplied < total && ` — el resto (${cop(total - creditApplied)}) queda como deuda.`}
+                                            </p>
+                                        )}
                                     </div>
 
-                                    {paymentSource !== "EXTERNAL" && (
+                                    {paymentSource !== "EXTERNAL" && paymentSource !== "CREDIT" && (
                                     <div className="grid grid-cols-2 gap-4">
                                         <div>
                                             <label className="block text-[10px] text-app-text-muted mb-1">Monto Pagado Inicial</label>

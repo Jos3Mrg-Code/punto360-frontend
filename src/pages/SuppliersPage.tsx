@@ -7,7 +7,7 @@ import EditPurchaseModal, { type EditablePurchase } from "../components/purchase
 import {
     Truck, Phone, Mail, Package, ChevronDown, ChevronUp,
     AlertCircle, CheckCircle2, Clock, Search, Edit2, X,
-    CreditCard, Banknote, ArrowLeftRight, Plus, Ban, AlertTriangle, Loader2
+    CreditCard, Banknote, ArrowLeftRight, Plus, Ban, AlertTriangle, Loader2, Wallet
 } from "lucide-react";
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -21,6 +21,7 @@ interface SupplierStat {
     totalInvoiced: number;
     totalPaid: number;
     balance: number;
+    creditBalance: number;
     lastPurchase: string | null;
 }
 
@@ -128,8 +129,14 @@ export default function SuppliersPage() {
 
     // Edit / cancel purchase
     const [editingPurchase, setEditingPurchase] = useState<SupplierPurchase | null>(null);
-    const [cancelId, setCancelId] = useState<string | null>(null);
+    const [cancelTarget, setCancelTarget] = useState<SupplierPurchase | null>(null);
+    const [cancelRefund, setCancelRefund] = useState<"AUTO" | "CREDIT">("AUTO");
     const [isCancelling, setIsCancelling] = useState(false);
+
+    // Transferir saldo a favor a cartera
+    const [creditModalOpen, setCreditModalOpen] = useState(false);
+    const [creditAmount, setCreditAmount] = useState("");
+    const [isTransferring, setIsTransferring] = useState(false);
 
     const reloadAfterChange = async () => {
         if (!selected) return;
@@ -140,19 +147,48 @@ export default function SuppliersPage() {
         setPurchases(purchasesRes.data);
     };
 
+    const openCancel = (p: SupplierPurchase) => {
+        setCancelTarget(p);
+        setCancelRefund("AUTO");
+    };
+
     const handleCancelPurchase = async () => {
-        if (!cancelId) return;
+        if (!cancelTarget) return;
         setIsCancelling(true);
         try {
-            await api.delete(`/purchases/${cancelId}`);
-            toast.success("Factura anulada. Stock, caja y cartera revertidos.");
-            setCancelId(null);
+            await api.delete(`/purchases/${cancelTarget.id}`, { data: { refund: cancelRefund } });
+            toast.success(
+                cancelRefund === "CREDIT" && Number(cancelTarget.paid_amount) > 0
+                    ? "Factura anulada. Lo pagado quedó como saldo a favor del proveedor."
+                    : "Factura anulada. Stock, caja y cartera revertidos.",
+            );
+            setCancelTarget(null);
             setExpandedId(null);
             await reloadAfterChange();
         } catch (e: any) {
             toast.error(e?.response?.data?.message ?? "Error al anular la factura");
         } finally {
             setIsCancelling(false);
+        }
+    };
+
+    const handleTransferCredit = async () => {
+        if (!selected) return;
+        const amt = parseFloat(creditAmount);
+        if (isNaN(amt) || amt <= 0 || amt > selected.creditBalance + 0.001) {
+            return toast.warning("Monto inválido");
+        }
+        setIsTransferring(true);
+        try {
+            await api.post(`/suppliers/${selected.id}/credit/to-cartera`, { amount: amt });
+            toast.success("Saldo a favor transferido a cartera.");
+            setCreditModalOpen(false);
+            setCreditAmount("");
+            await reloadAfterChange();
+        } catch (e: any) {
+            toast.error(e?.response?.data?.message ?? "Error al transferir el saldo");
+        } finally {
+            setIsTransferring(false);
         }
     };
 
@@ -416,11 +452,14 @@ export default function SuppliersPage() {
                                 </div>
 
                                 {/* Stats strip */}
-                                <div className="grid grid-cols-3 gap-3 mt-4">
+                                <div className={`grid gap-3 mt-4 ${selected.creditBalance > 0 ? "grid-cols-4" : "grid-cols-3"}`}>
                                     {[
                                         { label: "Facturas", value: selected.purchaseCount, cls: "text-app-text" },
                                         { label: "Total facturado", value: cop(selected.totalInvoiced), cls: "text-app-text" },
                                         { label: "Saldo pendiente", value: cop(selected.balance), cls: selected.balance > 0 ? "text-rose-400" : "text-emerald-400" },
+                                        ...(selected.creditBalance > 0
+                                            ? [{ label: "Saldo a favor", value: cop(selected.creditBalance), cls: "text-emerald-400" }]
+                                            : []),
                                     ].map(c => (
                                         <div key={c.label} className="bg-app-bg rounded-xl p-3 text-center border border-app-border/50">
                                             <p className={`text-sm font-black ${c.cls}`}>{c.value}</p>
@@ -428,6 +467,15 @@ export default function SuppliersPage() {
                                         </div>
                                     ))}
                                 </div>
+
+                                {selected.creditBalance > 0 && (
+                                    <button
+                                        onClick={() => { setCreditAmount(String(Math.round(selected.creditBalance))); setCreditModalOpen(true); }}
+                                        className="mt-3 w-full py-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 font-black text-xs border border-emerald-500/30 transition-all flex items-center justify-center gap-2"
+                                    >
+                                        <Wallet size={13} /> PASAR SALDO A FAVOR A CARTERA
+                                    </button>
+                                )}
                             </div>
 
                             {/* Invoice list */}
@@ -600,7 +648,7 @@ export default function SuppliersPage() {
                                                                 <Edit2 size={13} /> EDITAR FACTURA
                                                             </button>
                                                             <button
-                                                                onClick={() => setCancelId(p.id)}
+                                                                onClick={() => openCancel(p)}
                                                                 className="flex-1 py-2.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 font-black text-xs border border-rose-500/30 transition-all flex items-center justify-center gap-2"
                                                             >
                                                                 <Ban size={13} /> ANULAR FACTURA
@@ -763,9 +811,9 @@ export default function SuppliersPage() {
             )}
 
             {/* ── Cancel Purchase Confirm ─────────────────────────────────── */}
-            {cancelId && (
+            {cancelTarget && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-                    <div className="absolute inset-0 bg-app-bg/80 backdrop-blur-sm" onClick={() => setCancelId(null)} />
+                    <div className="absolute inset-0 bg-app-bg/80 backdrop-blur-sm" onClick={() => setCancelTarget(null)} />
                     <div className="relative w-full max-w-sm bg-app-card border border-rose-500/30 rounded-2xl shadow-2xl p-6 flex flex-col gap-5">
                         <div className="flex items-start gap-3">
                             <div className="w-10 h-10 rounded-xl bg-rose-500/20 flex items-center justify-center shrink-0">
@@ -774,12 +822,45 @@ export default function SuppliersPage() {
                             <div>
                                 <h3 className="font-black text-app-text text-lg">Anular factura</h3>
                                 <p className="text-sm text-app-text-muted mt-1">
-                                    Se revertirá el stock recibido y los movimientos de caja o cartera asociados. No se puede deshacer.
+                                    Se revertirá el stock recibido. No se puede deshacer.
                                 </p>
                             </div>
                         </div>
+
+                        {Number(cancelTarget.paid_amount) > 0 && (
+                            <div>
+                                <p className="text-[10px] font-black text-app-text-muted uppercase tracking-widest mb-2">
+                                    Esta factura tiene {cop(Number(cancelTarget.paid_amount))} pagados
+                                </p>
+                                <div className="space-y-2">
+                                    <button
+                                        onClick={() => setCancelRefund("AUTO")}
+                                        className={`w-full text-left px-3 py-2.5 rounded-xl border text-xs transition-all ${
+                                            cancelRefund === "AUTO"
+                                                ? "border-violet-500/60 bg-violet-500/10 text-app-text"
+                                                : "border-app-border text-app-text-muted hover:text-app-text"
+                                        }`}
+                                    >
+                                        <span className="font-black block">Devolver a caja / cartera</span>
+                                        <span className="text-[11px]">Revierte el pago de donde salió.</span>
+                                    </button>
+                                    <button
+                                        onClick={() => setCancelRefund("CREDIT")}
+                                        className={`w-full text-left px-3 py-2.5 rounded-xl border text-xs transition-all ${
+                                            cancelRefund === "CREDIT"
+                                                ? "border-emerald-500/60 bg-emerald-500/10 text-app-text"
+                                                : "border-app-border text-app-text-muted hover:text-app-text"
+                                        }`}
+                                    >
+                                        <span className="font-black block">Dejar como saldo a favor</span>
+                                        <span className="text-[11px]">Queda como crédito del proveedor para futuras compras.</span>
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
                         <div className="flex gap-3">
-                            <button onClick={() => setCancelId(null)} className="flex-1 py-2.5 rounded-xl border border-app-border text-app-text-muted text-sm font-bold hover:text-app-text transition-colors">
+                            <button onClick={() => setCancelTarget(null)} className="flex-1 py-2.5 rounded-xl border border-app-border text-app-text-muted text-sm font-bold hover:text-app-text transition-colors">
                                 Cancelar
                             </button>
                             <button
@@ -789,6 +870,46 @@ export default function SuppliersPage() {
                             >
                                 {isCancelling ? <Loader2 size={15} className="animate-spin" /> : <Ban size={15} />}
                                 Anular
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Transferir saldo a favor a cartera ──────────────────────── */}
+            {creditModalOpen && selected && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-app-bg/80 backdrop-blur-sm" onClick={() => setCreditModalOpen(false)} />
+                    <div className="relative w-full max-w-sm bg-app-card border border-app-border rounded-2xl shadow-2xl p-6 flex flex-col gap-4">
+                        <div className="flex items-center justify-between">
+                            <h3 className="font-black text-app-text">Pasar saldo a favor a cartera</h3>
+                            <button onClick={() => setCreditModalOpen(false)} className="text-app-text-muted hover:text-app-text">
+                                <X size={18} />
+                            </button>
+                        </div>
+                        <p className="text-xs text-app-text-muted">
+                            Saldo a favor disponible: <span className="text-emerald-400 font-black">{cop(selected.creditBalance)}</span>
+                        </p>
+                        <div>
+                            <label className="block text-[10px] font-black text-app-text-muted uppercase tracking-widest mb-1">Monto a transferir</label>
+                            <input
+                                type="number" min="1"
+                                value={creditAmount}
+                                onChange={e => setCreditAmount(e.target.value)}
+                                className="w-full bg-app-bg border border-app-border rounded-xl px-4 py-3 text-xl font-black text-app-text focus:outline-none focus:border-emerald-500/50"
+                            />
+                        </div>
+                        <div className="flex gap-3">
+                            <button onClick={() => setCreditModalOpen(false)} className="flex-1 py-2.5 rounded-xl border border-app-border text-app-text-muted text-sm font-bold hover:text-app-text transition-colors">
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={handleTransferCredit}
+                                disabled={isTransferring || !creditAmount}
+                                className="flex-[2] py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-sm transition-colors disabled:opacity-40 flex items-center justify-center gap-2"
+                            >
+                                {isTransferring ? <Loader2 size={15} className="animate-spin" /> : <Wallet size={15} />}
+                                Transferir
                             </button>
                         </div>
                     </div>
