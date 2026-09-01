@@ -63,11 +63,13 @@ interface PurchaseRecord {
     paid_amount: string;
     status: string;
     due_date?: string;
+    affects_inventory?: boolean;
+    invoice_number?: string | null;
     suppliers: { name: string; phone?: string } | null;
     purchase_items: {
         quantity: string;
         cost: string;
-        products: { name: string; sku: string; unit_type: string };
+        products: { name: string; sku: string; unit_type: string } | null;
     }[];
     purchase_payments: {
         amount: string;
@@ -1272,6 +1274,9 @@ export default function PurchasesPage() {
                                                 </p>
                                                 {p.status === 'CANCELLED' && (
                                                     <span className="text-[8px] font-bold bg-rose-500/20 text-rose-400 border border-rose-500/30 px-1.5 py-0.5 rounded uppercase">Anulada</span>
+                                                )}
+                                                {p.affects_inventory === false && (
+                                                    <span className="text-[8px] font-bold bg-app-border/50 text-app-text-muted border border-app-border px-1.5 py-0.5 rounded uppercase">Sin inventario</span>
                                                 )}
                                                 {view === "debts" && isOverdue && p.status !== 'CANCELLED' && (
                                                     <span className="text-[8px] font-bold bg-rose-500 text-white px-1.5 py-0.5 rounded uppercase">Vencido</span>

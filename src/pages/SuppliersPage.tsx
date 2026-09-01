@@ -4,6 +4,7 @@ import DashboardLayout from "../layouts/DashboardLayout";
 import { api } from "../api/axios";
 import { useAuth } from "../auth/AuthContext";
 import EditPurchaseModal, { type EditablePurchase } from "../components/purchases/EditPurchaseModal";
+import PayableInvoiceModal, { type PayableInvoice } from "../components/purchases/PayableInvoiceModal";
 import {
     Truck, Phone, Mail, Package, ChevronDown, ChevronUp,
     AlertCircle, CheckCircle2, Clock, Search, Edit2, X,
@@ -38,6 +39,7 @@ interface PurchaseItem {
     id: string;
     product_id: string | null;
     variant_id: string | null;
+    description?: string | null;
     quantity: number;
     cost: number;
     products: {
@@ -59,6 +61,10 @@ interface SupplierPurchase {
     status: string;
     due_date: string | null;
     created_at: string;
+    affects_inventory?: boolean;
+    invoice_number?: string | null;
+    invoice_date?: string | null;
+    notes?: string | null;
     purchase_items: PurchaseItem[];
     purchase_payments: PurchasePayment[];
 }
@@ -129,6 +135,7 @@ export default function SuppliersPage() {
 
     // Edit / cancel purchase
     const [editingPurchase, setEditingPurchase] = useState<SupplierPurchase | null>(null);
+    const [payableModal, setPayableModal] = useState<{ mode: "create" } | { mode: "edit"; invoice: SupplierPurchase } | null>(null);
     const [cancelTarget, setCancelTarget] = useState<SupplierPurchase | null>(null);
     const [cancelRefund, setCancelRefund] = useState<"AUTO" | "CREDIT">("AUTO");
     const [isCancelling, setIsCancelling] = useState(false);
@@ -476,6 +483,15 @@ export default function SuppliersPage() {
                                         <Wallet size={13} /> PASAR SALDO A FAVOR A CARTERA
                                     </button>
                                 )}
+
+                                {canEditPurchases && (
+                                    <button
+                                        onClick={() => setPayableModal({ mode: "create" })}
+                                        className="mt-2 w-full py-2 rounded-xl bg-violet-500/10 hover:bg-violet-500/20 text-violet-400 font-black text-xs border border-violet-500/30 transition-all flex items-center justify-center gap-2"
+                                    >
+                                        <Plus size={13} /> NUEVA FACTURA POR PAGAR
+                                    </button>
+                                )}
                             </div>
 
                             {/* Invoice list */}
@@ -510,6 +526,16 @@ export default function SuppliersPage() {
                                                             #{p.id.split("-")[0].toUpperCase()}
                                                         </span>
                                                         <StatusBadge status={p.status} />
+                                                        {p.affects_inventory === false && (
+                                                            <span className="text-[9px] font-black text-app-text-muted bg-app-border/40 border border-app-border px-1.5 py-0.5 rounded uppercase tracking-widest">
+                                                                Sin inventario
+                                                            </span>
+                                                        )}
+                                                        {p.invoice_number && (
+                                                            <span className="text-[9px] font-bold text-app-text-muted">
+                                                                Fact. {p.invoice_number}
+                                                            </span>
+                                                        )}
                                                         {isOverdue && (
                                                             <span className="text-[9px] font-black text-rose-400 bg-rose-500/10 border border-rose-500/30 px-1.5 py-0.5 rounded uppercase tracking-widest">
                                                                 Vencido
@@ -642,7 +668,9 @@ export default function SuppliersPage() {
                                                     {canEditPurchases && p.status !== "CANCELLED" && (
                                                         <div className="flex gap-2">
                                                             <button
-                                                                onClick={() => setEditingPurchase(p)}
+                                                                onClick={() => p.affects_inventory === false
+                                                                    ? setPayableModal({ mode: "edit", invoice: p })
+                                                                    : setEditingPurchase(p)}
                                                                 className="flex-1 py-2.5 rounded-xl bg-app-bg hover:bg-app-border/40 text-app-text font-black text-xs border border-app-border transition-all flex items-center justify-center gap-2"
                                                             >
                                                                 <Edit2 size={13} /> EDITAR FACTURA
@@ -804,6 +832,21 @@ export default function SuppliersPage() {
                     onClose={() => setEditingPurchase(null)}
                     onSaved={async () => {
                         setEditingPurchase(null);
+                        setExpandedId(null);
+                        await reloadAfterChange();
+                    }}
+                />
+            )}
+
+            {/* ── Payable Invoice Modal (crear / editar) ──────────────────── */}
+            {payableModal && selected && (
+                <PayableInvoiceModal
+                    supplierId={selected.id}
+                    supplierName={selected.name}
+                    invoice={payableModal.mode === "edit" ? (payableModal.invoice satisfies PayableInvoice) : undefined}
+                    onClose={() => setPayableModal(null)}
+                    onSaved={async () => {
+                        setPayableModal(null);
                         setExpandedId(null);
                         await reloadAfterChange();
                     }}
