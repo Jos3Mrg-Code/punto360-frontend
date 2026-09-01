@@ -602,52 +602,56 @@ export default function EditPurchaseModal({ purchase, supplierId, onClose, onSav
                                 </p>
                             ) : (
                                 <div className="space-y-2">
-                                    <div className="grid grid-cols-12 gap-2 px-1 text-[9px] font-black text-app-text-muted uppercase tracking-widest">
-                                        <span className="col-span-4">Variante</span>
-                                        <span className="col-span-2 text-center">Stock</span>
-                                        <span className="col-span-2 text-center">Cantidad</span>
-                                        <span className="col-span-2 text-center">Costo</span>
-                                        <span className="col-span-2 text-center">P. Venta</span>
-                                    </div>
                                     {variantRows.map(r => {
                                         const active = (parseFloat(r.quantity) || 0) > 0;
                                         return (
                                             <div
                                                 key={r.variantId}
-                                                className={`grid grid-cols-12 gap-2 items-center rounded-xl px-3 py-2 border ${
+                                                className={`rounded-xl px-3 py-3 border ${
                                                     active ? "bg-violet-500/5 border-violet-500/40" : "bg-app-bg border-app-border"
                                                 }`}
                                             >
-                                                <div className="col-span-4 min-w-0">
-                                                    <p className="text-xs font-bold text-violet-300 truncate">{r.label}</p>
-                                                    <p className="text-[10px] text-app-text-muted font-mono truncate">{r.sku}</p>
+                                                <div className="flex items-start justify-between gap-3 mb-2.5">
+                                                    <div className="flex flex-wrap gap-1 min-w-0">
+                                                        {r.label.split(" / ").map((part, i) => (
+                                                            <span key={i} className="text-[11px] font-bold text-violet-300 bg-violet-500/10 border border-violet-500/20 px-2 py-0.5 rounded-md">
+                                                                {part}
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                    <div className="text-right shrink-0">
+                                                        <p className="text-[10px] text-app-text-muted font-mono">{r.sku}</p>
+                                                        <p className="text-[10px] text-cyan-400 font-bold">Stock: {r.stockCount}</p>
+                                                    </div>
                                                 </div>
-                                                <div className="col-span-2 text-center">
-                                                    <span className="text-xs font-bold text-cyan-400">{r.stockCount}</span>
-                                                </div>
-                                                <div className="col-span-2">
-                                                    <input
-                                                        type="number" min="0" step="1" placeholder="0"
-                                                        value={r.quantity}
-                                                        onChange={e => setVariantRow(r.variantId, { quantity: e.target.value })}
-                                                        className="w-full bg-app-card border border-app-border rounded-lg px-2 py-1.5 text-sm text-app-text text-center focus:outline-none focus:border-violet-500/50"
-                                                    />
-                                                </div>
-                                                <div className="col-span-2">
-                                                    <input
-                                                        type="number" min="0" step="100"
-                                                        value={r.cost}
-                                                        onChange={e => setVariantRow(r.variantId, { cost: e.target.value })}
-                                                        className="w-full bg-app-card border border-app-border rounded-lg px-2 py-1.5 text-sm text-app-text text-center focus:outline-none focus:border-violet-500/50"
-                                                    />
-                                                </div>
-                                                <div className="col-span-2">
-                                                    <input
-                                                        type="number" min="0" step="100"
-                                                        value={r.price}
-                                                        onChange={e => setVariantRow(r.variantId, { price: e.target.value })}
-                                                        className="w-full bg-app-card border border-emerald-500/20 rounded-lg px-2 py-1.5 text-sm text-emerald-400 font-bold text-center focus:outline-none focus:border-emerald-500/40"
-                                                    />
+                                                <div className="grid grid-cols-3 gap-2">
+                                                    <div>
+                                                        <label className="block text-[9px] font-bold text-app-text-muted uppercase tracking-wide mb-0.5">Cantidad</label>
+                                                        <input
+                                                            type="number" min="0" step="1" placeholder="0"
+                                                            value={r.quantity}
+                                                            onChange={e => setVariantRow(r.variantId, { quantity: e.target.value })}
+                                                            className="w-full bg-app-card border border-app-border rounded-lg px-2 py-1.5 text-sm text-app-text text-center focus:outline-none focus:border-violet-500/50"
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-[9px] font-bold text-app-text-muted uppercase tracking-wide mb-0.5">Costo</label>
+                                                        <input
+                                                            type="number" min="0" step="100"
+                                                            value={r.cost}
+                                                            onChange={e => setVariantRow(r.variantId, { cost: e.target.value })}
+                                                            className="w-full bg-app-card border border-app-border rounded-lg px-2 py-1.5 text-sm text-app-text text-center focus:outline-none focus:border-violet-500/50"
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-[9px] font-bold text-app-text-muted uppercase tracking-wide mb-0.5">P. Venta</label>
+                                                        <input
+                                                            type="number" min="0" step="100"
+                                                            value={r.price}
+                                                            onChange={e => setVariantRow(r.variantId, { price: e.target.value })}
+                                                            className="w-full bg-app-card border border-emerald-500/20 rounded-lg px-2 py-1.5 text-sm text-emerald-400 font-bold text-center focus:outline-none focus:border-emerald-500/40"
+                                                        />
+                                                    </div>
                                                 </div>
                                             </div>
                                         );

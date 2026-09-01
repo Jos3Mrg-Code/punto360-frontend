@@ -721,51 +721,52 @@ export default function PurchasesPage() {
                                 <p className="text-center text-sm text-app-text-muted py-8">Este producto aún no tiene variantes creadas.</p>
                             ) : (
                                 <div className="space-y-3">
-                                    {/* Cabecera */}
-                                    <div className="grid grid-cols-12 gap-2 px-1 text-[10px] font-bold text-app-text-muted uppercase">
-                                        <span className="col-span-2">Variante</span>
-                                        <span className="col-span-2">SKU</span>
-                                        <span className="col-span-2 text-center">Stock</span>
-                                        <span className="col-span-2 text-center">Cantidad</span>
-                                        <span className="col-span-2 text-center">Costo</span>
-                                        <span className="col-span-2 text-center">P. Venta</span>
-                                    </div>
                                     {variantEntries.map((entry, idx) => (
-                                        <div key={entry.variantId} className="grid grid-cols-12 gap-2 items-center bg-app-bg border border-app-border rounded-xl px-3 py-2">
-                                            <div className="col-span-2">
-                                                <p className="text-xs font-bold text-violet-300 truncate">{entry.label}</p>
+                                        <div key={entry.variantId} className="bg-app-bg border border-app-border rounded-xl px-3 py-3">
+                                            {/* Atributos de la variante — cada uno en su propio chip */}
+                                            <div className="flex items-start justify-between gap-3 mb-2.5">
+                                                <div className="flex flex-wrap gap-1 min-w-0">
+                                                    {entry.label.split(" / ").map((part, i) => (
+                                                        <span key={i} className="text-[11px] font-bold text-violet-300 bg-violet-500/10 border border-violet-500/20 px-2 py-0.5 rounded-md">
+                                                            {part}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                                <div className="text-right shrink-0">
+                                                    <p className="text-[10px] font-mono text-app-text-muted">{entry.sku}</p>
+                                                    <p className="text-[10px] text-cyan-400 font-bold">Stock: {entry.stockCount}</p>
+                                                </div>
                                             </div>
-                                            <div className="col-span-2">
-                                                <p className="text-xs font-mono text-app-text-muted truncate">{entry.sku}</p>
-                                            </div>
-                                            <div className="col-span-2 text-center">
-                                                <span className="text-xs font-bold text-cyan-400">{entry.stockCount}</span>
-                                                <p className="text-[9px] text-app-text-muted">Uds</p>
-                                            </div>
-                                            <div className="col-span-2">
-                                                <input
-                                                    type="number" min="0" step="1"
-                                                    placeholder="0"
-                                                    value={entry.quantity}
-                                                    onChange={e => updateEntry(idx, "quantity", e.target.value)}
-                                                    className="w-full bg-app-card border border-app-border rounded-lg px-2 py-1.5 text-sm text-app-text text-center focus:outline-none focus:ring-1 focus:ring-violet-500/40"
-                                                />
-                                            </div>
-                                            <div className="col-span-2">
-                                                <input
-                                                    type="number" min="0" step="100"
-                                                    value={entry.cost}
-                                                    onChange={e => updateEntry(idx, "cost", e.target.value)}
-                                                    className="w-full bg-app-card border border-app-border rounded-lg px-2 py-1.5 text-sm text-app-text text-center focus:outline-none focus:ring-1 focus:ring-violet-500/40"
-                                                />
-                                            </div>
-                                            <div className="col-span-2">
-                                                <input
-                                                    type="number" min="0" step="100"
-                                                    value={entry.salePrice}
-                                                    onChange={e => updateEntry(idx, "salePrice", e.target.value)}
-                                                    className="w-full bg-app-card border border-emerald-500/20 rounded-lg px-2 py-1.5 text-sm text-emerald-400 font-bold text-center focus:outline-none focus:ring-1 focus:ring-emerald-500/40"
-                                                />
+                                            {/* Inputs */}
+                                            <div className="grid grid-cols-3 gap-2">
+                                                <div>
+                                                    <label className="block text-[9px] font-bold text-app-text-muted uppercase tracking-wide mb-0.5">Cantidad</label>
+                                                    <input
+                                                        type="number" min="0" step="1"
+                                                        placeholder="0"
+                                                        value={entry.quantity}
+                                                        onChange={e => updateEntry(idx, "quantity", e.target.value)}
+                                                        className="w-full bg-app-card border border-app-border rounded-lg px-2 py-1.5 text-sm text-app-text text-center focus:outline-none focus:ring-1 focus:ring-violet-500/40"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-[9px] font-bold text-app-text-muted uppercase tracking-wide mb-0.5">Costo</label>
+                                                    <input
+                                                        type="number" min="0" step="100"
+                                                        value={entry.cost}
+                                                        onChange={e => updateEntry(idx, "cost", e.target.value)}
+                                                        className="w-full bg-app-card border border-app-border rounded-lg px-2 py-1.5 text-sm text-app-text text-center focus:outline-none focus:ring-1 focus:ring-violet-500/40"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-[9px] font-bold text-app-text-muted uppercase tracking-wide mb-0.5">P. Venta</label>
+                                                    <input
+                                                        type="number" min="0" step="100"
+                                                        value={entry.salePrice}
+                                                        onChange={e => updateEntry(idx, "salePrice", e.target.value)}
+                                                        className="w-full bg-app-card border border-emerald-500/20 rounded-lg px-2 py-1.5 text-sm text-emerald-400 font-bold text-center focus:outline-none focus:ring-1 focus:ring-emerald-500/40"
+                                                    />
+                                                </div>
                                             </div>
                                         </div>
                                     ))}
@@ -986,7 +987,7 @@ export default function PurchasesPage() {
                                         <div className="col-span-4">
                                             <p className="text-sm font-medium text-app-text truncate">{item.productName}</p>
                                             {item.variantLabel ? (
-                                                <p className="text-[10px] text-violet-400 font-bold truncate">{item.variantLabel}</p>
+                                                <p className="text-[10px] text-violet-400 font-bold leading-tight">{item.variantLabel}</p>
                                             ) : null}
                                             <p className="text-[10px] text-app-text-muted">{item.sku} · {item.unit_type === "WEIGHT" ? "Kg" : "Unid."}</p>
                                             {!item.variantLabel && item.stockTotal !== undefined && (
