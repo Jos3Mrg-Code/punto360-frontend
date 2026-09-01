@@ -195,7 +195,7 @@ export default function PurchasesPage() {
         try {
             await api.post(`/purchases/${abonoModal.purchaseId}/payments`, {
                 amount: amt,
-                method: abonoSource === "CARTERA" ? "CASH" : abonoMethod,
+                method: abonoMethod,
                 paymentSource: abonoSource,
             });
             toast.success("Abono registrado con éxito");
@@ -523,7 +523,7 @@ export default function PurchasesPage() {
                 })),
                 total,
                 paidAmount: paidAmountValue,
-                paymentMethod: paymentSource === 'CARTERA' ? 'CASH' : paymentMethod,
+                paymentMethod,
                 paymentSource,
                 dueDate: paymentSource === 'EXTERNAL' ? undefined : (dueDate || undefined),
             });
@@ -644,20 +644,18 @@ export default function PurchasesPage() {
                             </div>
                         </div>
 
-                        {abonoSource === "CASH" && (
-                            <div>
-                                <label className="block text-xs font-medium text-app-text-muted mb-1.5">Método de Pago</label>
-                                <select
-                                    value={abonoMethod}
-                                    onChange={e => setAbonoMethod(e.target.value)}
-                                    className="w-full bg-app-bg border border-app-border rounded-xl px-3 py-2.5 text-app-text text-sm focus:outline-none focus:ring-1 focus:ring-violet-500/40"
-                                >
-                                    <option value="CASH">Efectivo</option>
-                                    <option value="CARD">Tarjeta</option>
-                                    <option value="TRANSFER">Transferencia</option>
-                                </select>
-                            </div>
-                        )}
+                        <div>
+                            <label className="block text-xs font-medium text-app-text-muted mb-1.5">Método de Pago</label>
+                            <select
+                                value={abonoMethod}
+                                onChange={e => setAbonoMethod(e.target.value)}
+                                className="w-full bg-app-bg border border-app-border rounded-xl px-3 py-2.5 text-app-text text-sm focus:outline-none focus:ring-1 focus:ring-violet-500/40"
+                            >
+                                <option value="CASH">Efectivo</option>
+                                <option value="CARD">Tarjeta</option>
+                                <option value="TRANSFER">Transferencia</option>
+                            </select>
+                        </div>
 
                         <div className="flex gap-3 pt-1">
                             <button onClick={() => setAbonoModal(null)} className="flex-1 py-2.5 rounded-xl border border-app-border text-app-text-muted text-sm hover:text-app-text transition-colors">
@@ -1107,8 +1105,7 @@ export default function PurchasesPage() {
                                             <select
                                                 value={paymentMethod}
                                                 onChange={e => setPaymentMethod(e.target.value)}
-                                                disabled={paymentSource === "CARTERA"}
-                                                className="w-full bg-app-bg border border-app-border rounded-xl px-3 py-2 text-app-text text-sm focus:outline-none focus:ring-1 focus:ring-violet-500/50 disabled:opacity-40"
+                                                className="w-full bg-app-bg border border-app-border rounded-xl px-3 py-2 text-app-text text-sm focus:outline-none focus:ring-1 focus:ring-violet-500/50"
                                             >
                                                 <option value="CASH">Efectivo</option>
                                                 <option value="CARD">Tarjeta</option>

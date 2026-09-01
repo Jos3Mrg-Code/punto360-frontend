@@ -131,6 +131,7 @@ export default function SuppliersPage() {
     const [payingId, setPayingId] = useState<string | null>(null);
     const [payAmount, setPayAmount] = useState("");
     const [payMethod, setPayMethod] = useState("CASH");
+    const [paySource, setPaySource] = useState<"CASH" | "CARTERA">("CASH");
     const [isSubmittingPay, setIsSubmittingPay] = useState(false);
 
     // Edit / cancel purchase
@@ -266,6 +267,7 @@ export default function SuppliersPage() {
         setPayingId(purchaseId);
         setPayAmount(balance.toFixed(0));
         setPayMethod("CASH");
+        setPaySource("CASH");
     };
 
     const submitPayment = async () => {
@@ -276,7 +278,8 @@ export default function SuppliersPage() {
         try {
             await api.post(`/purchases/${payingId}/payments`, {
                 amount,
-                paymentMethod: payMethod,
+                method: payMethod,
+                paymentSource: paySource,
             });
             // Refresh both the purchase list and supplier stats
             const [purchasesRes] = await Promise.all([
@@ -781,6 +784,27 @@ export default function SuppliersPage() {
                                     onChange={e => setPayAmount(e.target.value)}
                                     className="w-full bg-app-bg border border-app-border rounded-xl px-4 py-3 text-xl font-black text-app-text focus:outline-none focus:border-violet-500/50"
                                 />
+                            </div>
+                            <div>
+                                <label className="block text-[10px] font-black text-app-text-muted uppercase tracking-widest mb-1">Fuente del pago</label>
+                                <div className="grid grid-cols-2 gap-2">
+                                    {[
+                                        { id: "CASH" as const, label: "Sale de caja" },
+                                        { id: "CARTERA" as const, label: "Sale de cartera" },
+                                    ].map(s => (
+                                        <button
+                                            key={s.id}
+                                            onClick={() => setPaySource(s.id)}
+                                            className={`py-2 rounded-xl border text-xs font-black uppercase tracking-wider transition-all ${
+                                                paySource === s.id
+                                                    ? "bg-violet-500/10 border-violet-500/50 text-violet-400"
+                                                    : "border-app-border text-app-text-muted hover:border-app-text"
+                                            }`}
+                                        >
+                                            {s.label}
+                                        </button>
+                                    ))}
+                                </div>
                             </div>
                             <div>
                                 <label className="block text-[10px] font-black text-app-text-muted uppercase tracking-widest mb-1">Método de Pago</label>
