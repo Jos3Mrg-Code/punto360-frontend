@@ -10,6 +10,7 @@
   --color-app-text-muted: var(--theme-text-muted);
   --color-app-border: var(--theme-border);
   --color-app-glow: var(--theme-glow);
+  --color-app-overlay: var(--theme-overlay);
 }
 
 :root {
@@ -17,6 +18,7 @@
   --theme-bg: #0b0f1a;
   --theme-sidebar: rgba(15, 23, 42, 0.8);
   --theme-card: rgba(30, 41, 59, 0.5);
+  --theme-overlay: #1e293b;
   --theme-accent: #22d3ee;
   --theme-accent-hover: #0891b2;
   --theme-text-main: #f8fafc;
@@ -30,6 +32,7 @@
   --theme-bg: #f8f9fc;
   --theme-sidebar: #ffffff;
   --theme-card: #ffffff;
+  --theme-overlay: #ffffff;
   --theme-accent: #2563eb;
   --theme-accent-hover: #1d4ed8;
   --theme-text-main: #1e293b; /* slate-800 - Fuerte contraste */
@@ -43,6 +46,7 @@
   --theme-bg: #050505;
   --theme-sidebar: #0a0a0a;
   --theme-card: #111111;
+  --theme-overlay: #111111;
   --theme-accent: #ff007f;
   --theme-accent-hover: #e60073;
   --theme-text-main: #ffffff;
@@ -53,9 +57,10 @@
 
 [data-theme='neon-light'] {
   /* Kawaii / Clean Pink */
-  --theme-bg: #fdf2f8; 
+  --theme-bg: #fdf2f8;
   --theme-sidebar: #ffffff;
   --theme-card: #ffffff;
+  --theme-overlay: #ffffff;
   --theme-accent: #db2777; /* Pink-600 para mejor legibilidad en blanco */
   --theme-accent-hover: #be185d;
   --theme-text-main: #312e81; /* Indigo-950 para contraste suave pero legible */
@@ -69,6 +74,7 @@
   --theme-bg: #020617;
   --theme-sidebar: #0f172a;
   --theme-card: #1e293b;
+  --theme-overlay: #1e293b;
   --theme-accent: #10b981; /* Emerald-500 */
   --theme-accent-hover: #059669;
   --theme-text-main: #f0fdf4;

@@ -521,7 +521,7 @@ export default function PosPage() {
             autoFocus
           />
           {searchQuery !== '' && (
-            <div className="absolute top-full left-0 right-0 mt-2 bg-app-card border border-app-border rounded-2xl shadow-2xl max-h-80 overflow-y-auto z-[70] custom-scrollbar">
+            <div className="absolute top-full left-0 right-0 mt-2 bg-app-overlay border border-app-border rounded-2xl shadow-2xl max-h-80 overflow-y-auto z-[70] custom-scrollbar">
               {visibleProducts.length === 0 ? (
                 <div className="px-4 py-6 text-center text-app-text-muted text-sm font-bold">Sin resultados</div>
               ) : visibleProducts.map(p => {
@@ -531,21 +531,23 @@ export default function PosPage() {
                     key={p.id}
                     onClick={() => { addToCart(p); setSearchQuery(''); }}
                     disabled={agotado}
-                    className={`w-full border-b border-app-border last:border-0 ${agotado ? 'opacity-50 cursor-not-allowed' : 'hover:bg-app-accent/5 active:scale-[0.99]'} px-4 py-3 flex items-center gap-4 text-left transition-all`}
+                    className={`w-full border-b border-app-border last:border-0 ${agotado ? 'opacity-50 cursor-not-allowed' : 'hover:bg-app-accent/5 active:scale-[0.99]'} px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-left transition-all`}
                   >
-                    <div className="w-8 h-8 rounded-full bg-app-bg border border-app-border flex items-center justify-center font-black text-app-accent text-sm shrink-0">
-                      {p.name.charAt(0).toUpperCase()}
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      <div className="w-8 h-8 rounded-full bg-app-bg border border-app-border flex items-center justify-center font-black text-app-accent text-sm shrink-0">
+                        {p.name.charAt(0).toUpperCase()}
+                      </div>
+                      <div className="flex flex-col min-w-0 flex-1">
+                        <span className="text-app-text font-bold text-sm leading-tight">{p.name}</span>
+                        <span className="text-app-accent font-mono text-[10px] font-black">{p.sku}</span>
+                      </div>
                     </div>
-                    <div className="flex flex-col min-w-0 flex-1">
-                      <span className="text-app-text font-bold text-sm leading-tight truncate">{p.name}</span>
-                      <span className="text-app-accent font-mono text-[10px] font-black">{p.sku}</span>
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0">
+                    <div className="flex items-center gap-2 justify-between sm:justify-end shrink-0 pl-11 sm:pl-0">
                       {p.has_variants && <span className="px-2 py-0.5 bg-violet-500/20 text-violet-400 text-[9px] font-black rounded uppercase">Vars</span>}
                       {p.is_consignment && <span className="px-2 py-0.5 bg-amber-500/20 text-amber-400 text-[9px] font-black rounded uppercase">Consig.</span>}
                       {agotado && <span className="px-2 py-0.5 bg-rose-500/20 text-rose-500 text-[9px] font-black rounded uppercase">Agotado</span>}
                       {!p.is_consignment && !agotado && <span className="text-app-text-muted text-[10px] font-black uppercase">{p.unit_type === 'WEIGHT' ? `${p.stockCount}Kg` : `${p.stockCount}u`}</span>}
-                      <span className="text-emerald-500 font-black text-base w-24 text-right">${p.sale_price.toLocaleString()}</span>
+                      <span className="text-emerald-500 font-black text-base sm:w-24 text-right">${p.sale_price.toLocaleString()}</span>
                     </div>
                   </button>
                 );
@@ -601,14 +603,14 @@ export default function PosPage() {
               <p className="font-black uppercase tracking-widest text-sm">Busca o escanea un producto para agregarlo</p>
             </div>
           ) : (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
               {cart.map((item) => {
                 const key = cartKey(item);
                 return (
                   <div key={key} className="flex flex-col bg-app-card rounded-xl p-3 border border-app-border group/cart">
                     <div className="flex justify-between items-start mb-2">
                       <div className="flex flex-col flex-1 min-w-0">
-                        <span className="text-app-text font-bold text-sm pr-1 leading-tight truncate">{item.product.name}</span>
+                        <span className="text-app-text font-bold text-sm pr-1 leading-tight line-clamp-2">{item.product.name}</span>
                         {item.variantLabel
                           ? <span className="text-app-accent text-[9px] font-black tracking-wide truncate">{item.variantLabel}</span>
                           : <span className="text-app-text-muted text-[9px] uppercase font-black tracking-widest truncate">{item.product.sku}</span>}
