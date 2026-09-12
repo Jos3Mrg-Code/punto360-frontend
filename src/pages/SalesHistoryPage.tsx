@@ -1,6 +1,5 @@
 import { toast } from "../lib/toast";
 import React, { useEffect, useState, useMemo } from "react";
-import DashboardLayout from "../layouts/DashboardLayout";
 import { History, Search, ChevronDown, ChevronUp, AlertOctagon, CheckCircle2, RotateCcw, Printer } from "lucide-react";
 import { api } from "../api/axios";
 import { useAuth } from "../auth/AuthContext";
@@ -166,7 +165,7 @@ export default function SalesHistoryPage() {
     };
 
     return (
-        <DashboardLayout>
+        <>
             <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-6 md:mb-8">
                 <div>
                     <h1 className="text-xl md:text-3xl font-black text-app-text tracking-tight uppercase">
@@ -496,6 +495,6 @@ export default function SalesHistoryPage() {
                     })}
                 </div>
             </div>
-        </DashboardLayout>
+        </>
     );
 }

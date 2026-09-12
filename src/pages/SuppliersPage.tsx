@@ -1,6 +1,5 @@
 import { toast } from "../lib/toast";
 import { useEffect, useState } from "react";
-import DashboardLayout from "../layouts/DashboardLayout";
 import { api } from "../api/axios";
 import { useAuth } from "../auth/AuthContext";
 import EditPurchaseModal, { type EditablePurchase } from "../components/purchases/EditPurchaseModal";
@@ -319,7 +318,7 @@ export default function SuppliersPage() {
     // ── Render ─────────────────────────────────────────────────────────────
 
     return (
-        <DashboardLayout>
+        <>
             <div className="space-y-6">
 
                 {/* Page header */}
@@ -982,6 +981,6 @@ export default function SuppliersPage() {
                     </div>
                 </div>
             )}
-        </DashboardLayout>
+        </>
     );
 }

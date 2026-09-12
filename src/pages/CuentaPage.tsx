@@ -4,7 +4,6 @@ import {
     Trash2, X, Check, Loader2, CreditCard, Zap, Star, Crown, ArrowRight, Link2,
 } from 'lucide-react';
 import { api } from '../api/axios';
-import DashboardLayout from '../layouts/DashboardLayout';
 import { isScannerFixEnabled, setScannerFix } from '../utils/scannerFix';
 
 type Tab = 'perfil' | 'empresa' | 'sucursales' | 'planes' | 'integraciones';
@@ -605,7 +604,7 @@ export default function CuentaPage() {
     const [tab, setTab] = useState<Tab>('perfil');
 
     return (
-        <DashboardLayout>
+        <>
             <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-3xl font-bold text-app-text flex items-center gap-3">
@@ -634,6 +633,6 @@ export default function CuentaPage() {
             {tab === 'sucursales'    && <SucursalesTab />}
             {tab === 'planes'        && <PlanesTab />}
             {tab === 'integraciones' && <IntegracionesTab />}
-        </DashboardLayout>
+        </>
     );
 }

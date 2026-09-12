@@ -1,6 +1,5 @@
 import { toast } from "../lib/toast";
 import { useEffect, useState } from "react";
-import DashboardLayout from "../layouts/DashboardLayout";
 import { api } from "../api/axios";
 import { 
   Users, ShieldCheck, Plus, Trash2, Edit2, 
@@ -171,7 +170,7 @@ export default function UsersRolesPage() {
   };
 
   return (
-    <DashboardLayout>
+    <>
       <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-app-text flex items-center gap-3">
@@ -431,6 +430,6 @@ export default function UsersRolesPage() {
           </div>
         </div>
       )}
-    </DashboardLayout>
+    </>
   );
 }

@@ -1,5 +1,4 @@
 import { useState, useEffect, useMemo } from "react";
-import DashboardLayout from "../layouts/DashboardLayout";
 import { api } from "../api/axios";
 import { useAuth } from "../auth/AuthContext";
 import { toast } from "../lib/toast";
@@ -224,7 +223,7 @@ export default function ConsignmentsPage() {
     items.reduce((sum, i) => sum + i.quantity * i.consignor_price, 0);
 
   return (
-    <DashboardLayout>
+    <>
       {/* ── Modal Anular ── */}
       {cancelConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -583,6 +582,6 @@ export default function ConsignmentsPage() {
           </div>
         </div>
       </div>
-    </DashboardLayout>
+    </>
   );
 }

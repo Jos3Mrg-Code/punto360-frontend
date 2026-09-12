@@ -1,6 +1,5 @@
 import { toast } from "../lib/toast";
 import { useState, useRef } from "react";
-import DashboardLayout from "../layouts/DashboardLayout";
 import { api } from "../api/axios";
 import { Upload, FileX, CheckCircle2, AlertTriangle, Loader2, PackagePlus, X, ChevronRight } from "lucide-react";
 
@@ -111,7 +110,6 @@ export default function ImportProductsPage() {
   const categories = [...new Set(preview.map((p) => p.categoria))];
 
   return (
-    <DashboardLayout>
       <div className="max-w-5xl mx-auto space-y-6">
         <div>
           <h1 className="text-2xl font-black text-app-text">Importar Productos</h1>
@@ -292,6 +290,5 @@ export default function ImportProductsPage() {
           </>
         )}
       </div>
-    </DashboardLayout>
   );
 }

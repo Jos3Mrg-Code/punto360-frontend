@@ -5,6 +5,7 @@ import SuperAdminRoute from './routes/SuperAdminRoute';
 import { ThemeProvider } from './theme/ThemeContext';
 import ToastContainer from './components/ui/ToastContainer';
 import { pingBackend } from './api/axios';
+import DashboardLayout from './layouts/DashboardLayout';
 
 const LoginPage                = lazy(() => import('./pages/LoginPage'));
 const RegisterPage             = lazy(() => import('./pages/RegisterPage'));
@@ -97,25 +98,33 @@ const AppRoutes = () => {
             <Route path="/reset-password" element={<ResetPasswordPage />} />
             <Route path="/planes" element={<PrivateRoute><PlanesPage /></PrivateRoute>} />
             <Route path="/pago-exitoso" element={<PrivateRoute><PagoExitosoPage /></PrivateRoute>} />
-            <Route path="/cuenta" element={<PrivateRoute><CuentaPage /></PrivateRoute>} />
-            <Route path="/" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
-            <Route path="/ventas" element={<PrivateRoute><PosPage /></PrivateRoute>} />
-            <Route path="/historial" element={<PrivateRoute><SalesHistoryPage /></PrivateRoute>} />
-            <Route path="/caja" element={<PrivateRoute><CashRegisterPage /></PrivateRoute>} />
-            <Route path="/compras" element={<PrivateRoute><PurchasesPage /></PrivateRoute>} />
-            <Route path="/proveedores" element={<PrivateRoute><SuppliersPage /></PrivateRoute>} />
-            <Route path="/reportes" element={<PrivateRoute><ReportsPage /></PrivateRoute>} />
-            <Route path="/arqueos" element={<PrivateRoute><ArqueosPage /></PrivateRoute>} />
-            <Route path="/arqueoz" element={<PrivateRoute><ArqueosPage /></PrivateRoute>} />
-            <Route path="/usuarios" element={<PrivateRoute><UsersRolesPage /></PrivateRoute>} />
-            <Route path="/inventario" element={<PrivateRoute><InventoryPage /></PrivateRoute>} />
-            <Route path="/clientes" element={<PrivateRoute><CustomersPage /></PrivateRoute>} />
-            <Route path="/cartera" element={<PrivateRoute><CarteraPage /></PrivateRoute>} />
-            <Route path="/nuevo_producto" element={<NewProductPage />} />
-            <Route path="/importar-productos" element={<PrivateRoute><ImportProductsPage /></PrivateRoute>} />
-            <Route path="/etiquetas" element={<PrivateRoute><LabelsPage /></PrivateRoute>} />
-            <Route path="/cambios" element={<PrivateRoute><ExchangesPage /></PrivateRoute>} />
-            <Route path="/consignaciones" element={<PrivateRoute><ConsignmentsPage /></PrivateRoute>} />
+
+            {/* Módulos con sidebar/topbar: layout persistente, no se remonta al navegar */}
+            <Route element={<PrivateRoute><DashboardLayout /></PrivateRoute>}>
+              <Route index element={<Dashboard />} />
+              <Route path="ventas" element={<PosPage />} />
+              <Route path="historial" element={<SalesHistoryPage />} />
+              <Route path="caja" element={<CashRegisterPage />} />
+              <Route path="compras" element={<PurchasesPage />} />
+              <Route path="proveedores" element={<SuppliersPage />} />
+              <Route path="reportes" element={<ReportsPage />} />
+              <Route path="arqueos" element={<ArqueosPage />} />
+              <Route path="arqueoz" element={<ArqueosPage />} />
+              <Route path="usuarios" element={<UsersRolesPage />} />
+              <Route path="inventario" element={<InventoryPage />} />
+              <Route path="clientes" element={<CustomersPage />} />
+              <Route path="cartera" element={<CarteraPage />} />
+              <Route path="importar-productos" element={<ImportProductsPage />} />
+              <Route path="etiquetas" element={<LabelsPage />} />
+              <Route path="cambios" element={<ExchangesPage />} />
+              <Route path="consignaciones" element={<ConsignmentsPage />} />
+              <Route path="cuenta" element={<CuentaPage />} />
+            </Route>
+
+            {/* Usa el mismo layout pero sin exigir sesión (comportamiento previo) */}
+            <Route element={<DashboardLayout />}>
+              <Route path="/nuevo_producto" element={<NewProductPage />} />
+            </Route>
 
             {/* Super Admin */}
             <Route path="/superadmin" element={<SuperAdminRoute><SuperAdminLayout /></SuperAdminRoute>}>

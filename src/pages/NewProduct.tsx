@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import DashboardLayout from "../layouts/DashboardLayout";
 import NewProductFields, { type SavedProduct } from "../components/products/NewProductFields";
 import { useAuth } from "../auth/AuthContext";
 import { PackagePlus, CheckCircle2, Tag, PackageOpen } from "lucide-react";
@@ -12,7 +11,6 @@ export default function NewProductPage() {
 
     if (savedProduct) {
         return (
-            <DashboardLayout>
                 <div className="max-w-md mx-auto mt-12 flex flex-col items-center gap-6 text-center">
                     <div className="w-16 h-16 rounded-2xl bg-emerald-500/20 flex items-center justify-center">
                         <CheckCircle2 size={36} className="text-emerald-400" />
@@ -46,12 +44,10 @@ export default function NewProductPage() {
                         </button>
                     </div>
                 </div>
-            </DashboardLayout>
         );
     }
 
     return (
-        <DashboardLayout>
             <div className="space-y-6">
                 <div className="flex items-center gap-3 mb-6">
                     <div className="p-2 bg-emerald-500/20 text-emerald-400 rounded-lg">
@@ -69,6 +65,5 @@ export default function NewProductPage() {
                     }}
                 />
             </div>
-        </DashboardLayout>
     );
 }

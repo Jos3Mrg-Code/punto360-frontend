@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import InventoryStats from "../components/Inventory/InventoryStats";
 import InventoryFilters from "../components/Inventory/InventoryFilters";
 import InventoryTable from "../components/Inventory/InventoryTable";
-import DashboardLayout from "../layouts/DashboardLayout";
 import { useAuth } from "../auth/AuthContext";
 import { PackageOpen, X } from "lucide-react";
 import { api } from "../api/axios";
@@ -140,7 +139,7 @@ export default function InventoryPage() {
     });
 
     return (
-        <DashboardLayout>
+        <>
             <div className="space-y-6">
                 
                 {/* Título */}
@@ -212,7 +211,6 @@ export default function InventoryPage() {
                     </div>
                 </div>
             )}
-
-        </DashboardLayout>
+        </>
     );
 }

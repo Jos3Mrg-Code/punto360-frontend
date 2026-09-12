@@ -1,7 +1,6 @@
 import { toast } from "../lib/toast";
 import { useEffect, useState, useMemo } from "react";
 import { createPortal } from "react-dom";
-import DashboardLayout from "../layouts/DashboardLayout";
 import { api } from "../api/axios";
 import { useAuth } from "../auth/AuthContext";
 import {
@@ -543,7 +542,7 @@ export default function PurchasesPage() {
 
     // ──────────────────────────────────────────────────────────────────────────
     return (
-        <DashboardLayout>
+        <>
             {/* ── Modal Nuevo Producto (portal) ── */}
             {showNewProductModal && createPortal(
                 <div className="fixed inset-0 z-[9999] flex flex-col bg-app-bg overflow-y-auto">
@@ -1380,6 +1379,6 @@ export default function PurchasesPage() {
                     </div>
                 </div>
             </div>
-        </DashboardLayout>
+        </>
     );
 }

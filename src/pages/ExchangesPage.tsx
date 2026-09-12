@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import DashboardLayout from "../layouts/DashboardLayout";
 import { api } from "../api/axios";
 import {
   ArrowLeftRight, Search, ChevronDown, CheckCircle2,
@@ -230,7 +229,6 @@ export default function ExchangesPage() {
   };
 
   return (
-    <DashboardLayout>
       <div className="space-y-6 max-w-5xl mx-auto">
 
         {/* Header */}
@@ -464,6 +462,5 @@ export default function ExchangesPage() {
         )}
 
       </div>
-    </DashboardLayout>
   );
 }

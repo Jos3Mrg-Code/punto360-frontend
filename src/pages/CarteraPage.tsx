@@ -1,6 +1,5 @@
 import { toast } from "../lib/toast";
 import { useEffect, useState } from "react";
-import DashboardLayout from "../layouts/DashboardLayout";
 import { api } from "../api/axios";
 import {
     Wallet, TrendingDown, Plus, Loader2,
@@ -117,17 +116,15 @@ export default function CarteraPage() {
 
     if (isLoading) {
         return (
-            <DashboardLayout>
                 <div className="flex justify-center items-center h-64 gap-3 text-app-text/40">
                     <Loader2 size={24} className="animate-spin text-app-accent" />
                     <span>Cargando cartera...</span>
                 </div>
-            </DashboardLayout>
         );
     }
 
     return (
-        <DashboardLayout>
+        <>
             <div className="max-w-4xl mx-auto space-y-6">
 
                 {/* Header */}
@@ -466,6 +463,6 @@ export default function CarteraPage() {
                     </div>
                 </div>
             )}
-        </DashboardLayout>
+        </>
     );
 }

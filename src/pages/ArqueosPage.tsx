@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import DashboardLayout from "../layouts/DashboardLayout";
 import { useAuth } from "../auth/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api/axios";
@@ -175,7 +174,6 @@ export default function ArqueosPage() {
     // ── Render ────────────────────────────────────────────────────────────────
 
     return (
-        <DashboardLayout>
             <div className="space-y-6">
 
                 {/* Header */}
@@ -444,6 +442,5 @@ export default function ArqueosPage() {
                     </div>
                 )}
             </div>
-        </DashboardLayout>
     );
 }

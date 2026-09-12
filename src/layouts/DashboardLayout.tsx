@@ -1,9 +1,10 @@
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
+import { Outlet } from "react-router-dom";
 import Topbar from "../components/Topbar";
 import Sidebar from "../components/Sidebar";
 import SubscriptionBanner from "../components/SubscriptionBanner";
 
-export default function DashboardLayout({ children }: { children: ReactNode }) {
+export default function DashboardLayout() {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
     return (
@@ -26,7 +27,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                         marginLeft: 'var(--sidebar-render-width, 0px)'
                       }}>
                     <div className="max-w-7xl mx-auto w-full">
-                        {children}
+                        <Outlet />
                     </div>
                 </main>
             </div>

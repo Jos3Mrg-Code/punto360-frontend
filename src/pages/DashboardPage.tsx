@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import DashboardLayout from "../layouts/DashboardLayout";
 import { useAuth } from "../auth/AuthContext";
 import { api } from "../api/axios";
 import {
@@ -84,7 +83,7 @@ export default function DashboardPage() {
     : [];
 
   return (
-    <DashboardLayout>
+    <>
       {/* Header */}
       <div className="mb-6 md:mb-8 flex flex-col md:flex-row md:items-start justify-between gap-4">
         <div>
@@ -243,6 +242,6 @@ export default function DashboardPage() {
           </div>
         </>
       )}
-    </DashboardLayout>
+    </>
   );
 }

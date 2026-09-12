@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useLocation } from "react-router-dom";
-import DashboardLayout from "../layouts/DashboardLayout";
 import { api } from "../api/axios";
 import JsBarcode from "jsbarcode";
 import { Tag, Settings, Printer, Search, Plus, Trash2, Save, CheckCircle2, Wifi, WifiOff, ChevronDown, ExternalLink, Clock, X, PrinterCheck, ZoomIn, ZoomOut, RefreshCw } from "lucide-react";
@@ -759,7 +758,6 @@ export default function LabelsPage() {
     const qzError = qzStatus === "error";
 
     return (
-        <DashboardLayout>
             <div className="space-y-6">
                 <div className="flex items-center gap-3">
                     <div className="p-2 bg-violet-500/20 text-violet-400 rounded-lg"><Tag size={28} /></div>
@@ -1249,6 +1247,5 @@ export default function LabelsPage() {
                     </div>
                 )}
             </div>
-        </DashboardLayout>
     );
 }

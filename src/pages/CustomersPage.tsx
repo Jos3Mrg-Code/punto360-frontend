@@ -1,6 +1,5 @@
 import { toast } from "../lib/toast";
 import { useEffect, useState, useMemo } from "react";
-import DashboardLayout from "../layouts/DashboardLayout";
 import { api } from "../api/axios";
 import { useAuth } from "../auth/AuthContext";
 import {
@@ -198,7 +197,7 @@ export default function CustomersPage() {
     const selected = customers.find(c => c.id === selectedId);
 
     return (
-        <DashboardLayout>
+        <>
             <div className="mb-6 flex items-center justify-between gap-4 flex-wrap">
                 <div>
                     <h1 className="text-3xl font-bold text-app-text flex items-center gap-3">
@@ -617,6 +616,6 @@ export default function CustomersPage() {
                     </div>
                 </div>
             )}
-        </DashboardLayout>
+        </>
     );
 }

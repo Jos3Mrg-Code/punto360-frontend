@@ -2,7 +2,6 @@ import { toast } from "../lib/toast";
 import { scannerNormalize } from "../utils/scannerFix";
 import { useEffect, useState, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import DashboardLayout from "../layouts/DashboardLayout";
 import { printReceipt, formatSaleNumber, getPaperWidth, PAPER_WIDTH_KEY, type ReceiptHeader } from "../lib/receipt";
 import { ShoppingCart, Search, CreditCard, Banknote, Building2, Plus, Minus, Trash2, CheckCircle2, Loader2, AlertTriangle, TrendingUp, Receipt, Wallet, UserCheck, X, Pause, Clock, Layers, ScanLine } from "lucide-react";
 import { api } from "../api/axios";
@@ -467,19 +466,16 @@ export default function PosPage() {
   // ── Loading state ──────────────────────────────────────────────────────────
   if (hasCashSession === null) {
     return (
-      <DashboardLayout>
         <div className="flex justify-center items-center h-64 gap-3 text-app-text/40">
           <Loader2 size={24} className="animate-spin text-app-accent" />
           <span>Verificando sesión de caja...</span>
         </div>
-      </DashboardLayout>
     );
   }
 
   // ── Caja Cerrada → Bloqueo ─────────────────────────────────────────────────
   if (hasCashSession === false) {
     return (
-      <DashboardLayout>
         <div className="flex flex-col items-center justify-center h-[calc(100vh-120px)] text-center gap-6">
           <div className="w-24 h-24 rounded-full bg-rose-500/10 border border-rose-500/20 flex items-center justify-center">
             <AlertTriangle size={44} className="text-rose-400" />
@@ -498,7 +494,6 @@ export default function PosPage() {
             Abrir Caja →
           </button>
         </div>
-      </DashboardLayout>
     );
   }
 
@@ -506,7 +501,6 @@ export default function PosPage() {
 
   return (
     <>
-    <DashboardLayout>
       <div className="flex flex-col h-[calc(100vh-136px)] -mb-10">
       {/* ── BARRA SUPERIOR (search + dropdown resultados) ── */}
       <div className="flex items-center gap-2 mb-3 relative z-[60]">
@@ -1122,7 +1116,6 @@ export default function PosPage() {
           </div>
         </div>
       )}
-    </DashboardLayout>
 
     {showScanner && (
       <BarcodeScannerModal

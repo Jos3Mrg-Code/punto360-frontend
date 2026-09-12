@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import DashboardLayout from "../layouts/DashboardLayout";
 import { api } from "../api/axios";
 import { useAuth } from "../auth/AuthContext";
 import { useTheme } from "../theme/ThemeContext";
@@ -110,17 +109,14 @@ export default function ReportsPage() {
 
   if (!hasPermission("reports.view")) {
     return (
-      <DashboardLayout>
         <div className="flex flex-col items-center justify-center h-[60vh] text-app-text-muted">
           <Lock size={64} className="mb-4 opacity-20" />
           <h2 className="text-xl font-bold">Acceso Denegado</h2>
         </div>
-      </DashboardLayout>
     );
   }
 
   return (
-    <DashboardLayout>
       <div className="space-y-6">
 
         {/* Header + filtros */}
@@ -532,6 +528,5 @@ export default function ReportsPage() {
           </>
         )}
       </div>
-    </DashboardLayout>
   );
 }

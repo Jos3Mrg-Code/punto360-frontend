@@ -1,6 +1,5 @@
 import { toast } from "../lib/toast";
 import { useEffect, useState, useCallback } from "react";
-import DashboardLayout from "../layouts/DashboardLayout";
 import { api } from "../api/axios";
 import { useAuth } from "../auth/AuthContext";
 import {
@@ -178,12 +177,10 @@ export default function CashRegisterPage() {
 
     if (isLoading) {
         return (
-            <DashboardLayout>
                 <div className="flex justify-center items-center h-64 gap-3 text-app-text-muted">
                     <Loader2 size={24} className="animate-spin" />
                     <span>Verificando sesión de caja...</span>
                 </div>
-            </DashboardLayout>
         );
     }
 
@@ -192,7 +189,6 @@ export default function CashRegisterPage() {
         const { summary } = closeSummary;
         const isOver = summary.difference >= 0;
         return (
-            <DashboardLayout>
                 <div className="max-w-2xl mx-auto">
                     <div className="text-center mb-8">
                         <div className="w-20 h-20 mx-auto rounded-full bg-emerald-500/20 flex items-center justify-center mb-4">
@@ -290,14 +286,12 @@ export default function CashRegisterPage() {
                         Abrir Nueva Caja
                     </button>
                 </div>
-            </DashboardLayout>
         );
     }
 
     // ── CAJA CERRADA → FORMULARIO APERTURA ──────────────────────────────────
     if (!session) {
         return (
-            <DashboardLayout>
                 <div className="max-w-md mx-auto mt-8">
                     <div className="text-center mb-8">
                         <div className="w-20 h-20 mx-auto rounded-full bg-app-card border border-app-border flex items-center justify-center mb-4">
@@ -334,7 +328,6 @@ export default function CashRegisterPage() {
                         </button>
                     </div>
                 </div>
-            </DashboardLayout>
         );
     }
 
@@ -346,7 +339,7 @@ export default function CashRegisterPage() {
     const minutes = Math.floor((diffMs % 3600000) / 60000);
 
     return (
-        <DashboardLayout>
+        <>
             {/* Header */}
             <div className="flex items-start justify-between mb-6">
                 <div>
@@ -567,6 +560,6 @@ export default function CashRegisterPage() {
                     )}
                 </div>
             </div>
-        </DashboardLayout>
+        </>
     );
 }
