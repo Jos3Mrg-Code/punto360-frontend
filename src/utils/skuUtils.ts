@@ -2,6 +2,45 @@ export function stripAccents(s: string): string {
     return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 }
 
+const naturalCollator = new Intl.Collator("es", { numeric: true, sensitivity: "base" });
+
+/**
+ * Ordena variantes por sus valores de atributo: agrupa por el primer atributo
+ * (según el orden en que se definieron en el producto) y, dentro de cada grupo,
+ * ordena el siguiente atributo de forma natural (numérico si son tallas,
+ * alfabético si es texto). Cada variante puede traer sus `values` en cualquier
+ * orden — se normalizan por `attribute.position` antes de comparar.
+ */
+export function sortVariantsByAttributes<T extends { values: any[] }>(variants: T[]): T[] {
+    const orderedValues = (v: T) =>
+        [...(v.values ?? [])].sort(
+            (x: any, y: any) => (x.attribute_value?.attribute?.position ?? 0) - (y.attribute_value?.attribute?.position ?? 0),
+        );
+
+    return [...variants].sort((a, b) => {
+        const av = orderedValues(a);
+        const bv = orderedValues(b);
+        const len = Math.max(av.length, bv.length);
+        for (let i = 0; i < len; i++) {
+            const cmp = naturalCollator.compare(av[i]?.attribute_value?.value ?? "", bv[i]?.attribute_value?.value ?? "");
+            if (cmp !== 0) return cmp;
+        }
+        return 0;
+    });
+}
+
+/**
+ * Producto cartesiano de varios arrays.
+ * cartesian([["35","36"],["azul","rojo"]]) \u2192
+ *   [["35","azul"],["35","rojo"],["36","azul"],["36","rojo"]]
+ */
+export function cartesian<T>(arrays: T[][]): T[][] {
+    return arrays.reduce<T[][]>(
+        (acc, arr) => acc.flatMap(a => arr.map(b => [...a, b])),
+        [[]],
+    );
+}
+
 /**
  * Genera el SKU corto de una variante a partir del SKU base del producto
  * y los valores de los atributos (color, talla, etc.).

@@ -5,7 +5,7 @@ import { PlusCircle, Loader2, Layers, Trash2, Plus, X, ChevronDown, ChevronUp, C
 import { toast } from "../../lib/toast";
 import BarcodeScannerModal from "../ui/BarcodeScannerModal";
 import type { ProductRow } from "../../pages/InventoryPage";
-import { buildShortVariantSku } from "../../utils/skuUtils";
+import { buildShortVariantSku, cartesian, sortVariantsByAttributes } from "../../utils/skuUtils";
 
 interface AttributeValue { id: string; value: string; position: number; }
 interface Attribute { id: string; name: string; values: AttributeValue[]; }
@@ -154,14 +154,6 @@ function AttributeCard({ attr, productId, onDelete, onValueAdded }: {
   );
 }
 
-// Producto cartesiano de arrays
-function cartesian<T>(arrays: T[][]): T[][] {
-  return arrays.reduce<T[][]>(
-    (acc, arr) => acc.flatMap(a => arr.map(b => [...a, b])),
-    [[]]
-  );
-}
-
 export default function NewProductFields({ initialData, onSaveSuccess, onCancel, fromPurchase = false }: NewProductFieldsProps) {
   const { user } = useAuth();
   const isEdit = !!initialData;
@@ -272,7 +264,7 @@ export default function NewProductFields({ initialData, onSaveSuccess, onCancel,
       api.get(`/products/${productId}/variants`),
     ]);
     setAttributes(attrRes.data);
-    setVariants(varRes.data);
+    setVariants(sortVariantsByAttributes(varRes.data));
     setShowVariants(true);
   };
 

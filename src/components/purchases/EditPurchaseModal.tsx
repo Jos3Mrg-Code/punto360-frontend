@@ -5,6 +5,7 @@ import { toast } from "../../lib/toast";
 import {
     X, Search, Trash2, Plus, Loader2, CheckCircle2, Layers, Package,
 } from "lucide-react";
+import { buildShortVariantSku, cartesian, sortVariantsByAttributes } from "../../utils/skuUtils";
 
 // ── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -130,9 +131,10 @@ export default function EditPurchaseModal({ purchase, supplierId, onClose, onSav
     const [variantRows, setVariantRows] = useState<VariantRow[]>([]);
     const [loadingVariants, setLoadingVariants] = useState(false);
     const [attributes, setAttributes] = useState<ProductAttribute[]>([]);
+    const [variantSearch, setVariantSearch] = useState("");
     const [showNewVar, setShowNewVar] = useState(false);
     const [newVarAttrs, setNewVarAttrs] = useState<Record<string, string>>({});
-    const [newVarSku, setNewVarSku] = useState("");
+    const [newVarCost, setNewVarCost] = useState("");
     const [newVarPrice, setNewVarPrice] = useState("");
     const [creatingVar, setCreatingVar] = useState(false);
 
@@ -201,9 +203,10 @@ export default function EditPurchaseModal({ purchase, supplierId, onClose, onSav
         setVariantPanel(null);
         setVariantRows([]);
         setAttributes([]);
+        setVariantSearch("");
         setShowNewVar(false);
         setNewVarAttrs({});
-        setNewVarSku("");
+        setNewVarCost("");
         setNewVarPrice("");
     };
 
@@ -211,7 +214,9 @@ export default function EditPurchaseModal({ purchase, supplierId, onClose, onSav
         setVariantPanel(product);
         setVariantRows([]);
         setAttributes([]);
+        setVariantSearch("");
         setShowNewVar(false);
+        setNewVarCost(String(product.cost_price ?? 0));
         setLoadingVariants(true);
         try {
             const [varRes, attrRes] = await Promise.all([
@@ -220,7 +225,7 @@ export default function EditPurchaseModal({ purchase, supplierId, onClose, onSav
             ]);
             setAttributes(attrRes.data ?? []);
             setVariantRows(
-                (varRes.data ?? []).map((v: any) => {
+                sortVariantsByAttributes(varRes.data ?? []).map((v: any) => {
                     const existing = lines.find(l => l.variantId === v.id);
                     const stockCount = (v.stock ?? []).reduce((s: number, x: any) => s + Number(x.quantity), 0);
                     return {
@@ -246,52 +251,86 @@ export default function EditPurchaseModal({ purchase, supplierId, onClose, onSav
 
     const createNewVariant = async () => {
         if (!variantPanel) return;
-        const missing = attributes.filter(a => !newVarAttrs[a.id]?.trim());
-        if (missing.length > 0) return toast.warning(`Completa: ${missing.map(a => a.name).join(", ")}`);
-        if (!newVarSku.trim()) return toast.warning("El SKU es requerido");
+        // Cada atributo acepta varios valores separados por coma (ej. "35,36,37")
+        const parsedAttrs = attributes.map(attr => ({
+            attr,
+            values: (newVarAttrs[attr.id] ?? "").split(",").map(v => v.trim()).filter(Boolean),
+        }));
+        const missing = parsedAttrs.filter(p => p.values.length === 0);
+        if (missing.length > 0) return toast.warning(`Completa: ${missing.map(p => p.attr.name).join(", ")}`);
         if (!newVarPrice || Number(newVarPrice) <= 0) return toast.warning("El precio de venta es requerido");
 
         setCreatingVar(true);
         try {
-            const attrValueIds: string[] = [];
-            for (const attr of attributes) {
-                const typed = newVarAttrs[attr.id].trim();
-                const existing = attr.values.find(v => v.value.toLowerCase() === typed.toLowerCase());
-                if (existing) {
-                    attrValueIds.push(existing.id);
-                } else {
-                    const res = await api.post(`/products/${variantPanel.id}/attributes/${attr.id}/values`, { value: typed });
-                    attrValueIds.push(res.data.id);
-                    setAttributes(prev => prev.map(a => a.id === attr.id
-                        ? { ...a, values: [...a.values, { id: res.data.id, value: typed }] }
-                        : a));
+            // Resolver (o crear) cada valor escrito, por atributo
+            const idsByAttr: string[][] = [];
+            for (const { attr, values } of parsedAttrs) {
+                const ids: string[] = [];
+                let knownValues = attr.values;
+                for (const typed of values) {
+                    const existing = knownValues.find(v => v.value.toLowerCase() === typed.toLowerCase());
+                    if (existing) {
+                        ids.push(existing.id);
+                    } else {
+                        const res = await api.post(`/products/${variantPanel.id}/attributes/${attr.id}/values`, { value: typed });
+                        knownValues = [...knownValues, { id: res.data.id, value: typed }];
+                        ids.push(res.data.id);
+                        setAttributes(prev => prev.map(a => a.id === attr.id ? { ...a, values: knownValues } : a));
+                    }
                 }
+                idsByAttr.push(ids);
             }
-            const res = await api.post(`/products/${variantPanel.id}/variants`, {
-                sku: newVarSku.trim(),
-                sale_price: Number(newVarPrice),
-                attribute_value_ids: attrValueIds,
-                stock: 0,
+
+            // Combinaciones (producto cartesiano) entre los valores de cada atributo
+            const idCombos = cartesian(idsByAttr);
+            const labelCombos = cartesian(parsedAttrs.map(p => p.values));
+
+            const existingSkus = new Set(variantRows.map(r => r.sku.toUpperCase()));
+            const usedSkus = new Set<string>();
+            const variantsPayload = idCombos.map((valueIds, i) => {
+                let sku = buildShortVariantSku(variantPanel.sku, labelCombos[i]);
+                if (usedSkus.has(sku) || existingSkus.has(sku.toUpperCase())) {
+                    let n = 2;
+                    while (usedSkus.has(`${sku}${n}`) || existingSkus.has(`${sku}${n}`.toUpperCase())) n++;
+                    sku = `${sku}${n}`;
+                }
+                usedSkus.add(sku);
+                return {
+                    sku,
+                    sale_price: Number(newVarPrice),
+                    cost_price: Number(newVarCost) || 0,
+                    attribute_value_ids: valueIds,
+                    stock: 0,
+                };
             });
-            const v = res.data;
-            const label = attributes.map(a => `${a.name}: ${newVarAttrs[a.id]}`).join(" / ") || v.sku;
-            setVariantRows(prev => [
-                ...prev,
-                {
+
+            const res = await api.post(`/products/${variantPanel.id}/variants/batch`, { variants: variantsPayload });
+            const { created, errors, duplicateSkus } = res.data as { created: number; errors: number; duplicateSkus: string[] };
+
+            // Releer variantes del producto para reflejar lo creado con datos reales
+            const varRes = await api.get(`/products/${variantPanel.id}/variants`);
+            setVariantRows(prev => sortVariantsByAttributes(varRes.data ?? []).map((v: any) => {
+                const existingRow = prev.find(r => r.variantId === v.id);
+                if (existingRow) return existingRow;
+                const stockCount = (v.stock ?? []).reduce((s: number, x: any) => s + Number(x.quantity), 0);
+                return {
                     variantId: v.id,
-                    label,
+                    label: variantLabelOf(v),
                     sku: v.sku,
-                    quantity: "1",
-                    cost: String(Number(variantPanel.cost_price ?? 0)),
-                    price: String(newVarPrice),
-                    stockCount: 0,
-                },
-            ]);
+                    quantity: "",
+                    cost: String(Number(v.cost_price ?? 0)),
+                    price: String(Number(v.sale_price ?? 0)),
+                    stockCount,
+                } as VariantRow;
+            }));
+
+            if (errors === 0) {
+                toast.success(`${created} variante${created !== 1 ? "s" : ""} creada${created !== 1 ? "s" : ""}`);
+            } else {
+                toast.warning(`${created} creada${created !== 1 ? "s" : ""}. ${errors} SKU${errors !== 1 ? "s" : ""} ya existía${errors !== 1 ? "n" : ""}: ${duplicateSkus.join(", ")}`);
+            }
             setShowNewVar(false);
             setNewVarAttrs({});
-            setNewVarSku("");
-            setNewVarPrice("");
-            toast.success("Variante creada");
         } catch (e: any) {
             toast.error(e?.response?.data?.message ?? "Error al crear la variante");
         } finally {
@@ -602,7 +641,20 @@ export default function EditPurchaseModal({ purchase, supplierId, onClose, onSav
                                 </p>
                             ) : (
                                 <div className="space-y-2">
-                                    {variantRows.map(r => {
+                                    {variantRows.length > 1 && (
+                                        <div className="relative mb-1">
+                                            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-app-text-muted" />
+                                            <input
+                                                value={variantSearch}
+                                                onChange={e => setVariantSearch(e.target.value)}
+                                                placeholder="Filtrar por talla, color..."
+                                                className="w-full bg-app-bg border border-app-border rounded-lg pl-8 pr-3 py-2 text-xs text-app-text focus:outline-none focus:border-violet-500/50"
+                                            />
+                                        </div>
+                                    )}
+                                    {variantRows
+                                        .filter(r => !variantSearch.trim() || r.label.toLowerCase().includes(variantSearch.trim().toLowerCase()))
+                                        .map(r => {
                                         const active = (parseFloat(r.quantity) || 0) > 0;
                                         return (
                                             <div
@@ -671,7 +723,10 @@ export default function EditPurchaseModal({ purchase, supplierId, onClose, onSav
                                         </button>
                                     ) : (
                                         <div className="bg-app-bg border border-violet-500/30 rounded-xl p-4 space-y-3">
-                                            <p className="text-xs font-bold text-violet-300 uppercase tracking-wide">Nueva variante</p>
+                                            <div>
+                                                <p className="text-xs font-bold text-violet-300 uppercase tracking-wide">Nueva variante</p>
+                                                <p className="text-[10px] text-app-text-muted mt-0.5">Separa varios valores con coma para crear combinaciones (ej: 35,36,37). El SKU se genera automático.</p>
+                                            </div>
                                             {attributes.map(attr => (
                                                 <div key={attr.id}>
                                                     <label className="text-[10px] font-bold text-app-text-muted uppercase tracking-widest mb-1 block">{attr.name}</label>
@@ -679,7 +734,7 @@ export default function EditPurchaseModal({ purchase, supplierId, onClose, onSav
                                                         list={`edit-attr-${attr.id}`}
                                                         value={newVarAttrs[attr.id] ?? ""}
                                                         onChange={e => setNewVarAttrs(prev => ({ ...prev, [attr.id]: e.target.value }))}
-                                                        placeholder={`Ej: ${attr.values[0]?.value ?? attr.name}`}
+                                                        placeholder={`Ej: ${attr.values[0]?.value ?? attr.name}, ...`}
                                                         className="w-full bg-app-card border border-app-border rounded-lg px-3 py-2 text-sm text-app-text focus:outline-none focus:border-violet-500/50"
                                                     />
                                                     <datalist id={`edit-attr-${attr.id}`}>
@@ -689,12 +744,12 @@ export default function EditPurchaseModal({ purchase, supplierId, onClose, onSav
                                             ))}
                                             <div className="grid grid-cols-2 gap-3">
                                                 <div>
-                                                    <label className="text-[10px] font-bold text-app-text-muted uppercase tracking-widest mb-1 block">SKU</label>
+                                                    <label className="text-[10px] font-bold text-app-text-muted uppercase tracking-widest mb-1 block">P. Costo</label>
                                                     <input
-                                                        value={newVarSku}
-                                                        onChange={e => setNewVarSku(e.target.value)}
-                                                        placeholder="SKU único"
-                                                        className="w-full bg-app-card border border-app-border rounded-lg px-3 py-2 text-sm text-app-text font-mono focus:outline-none focus:border-violet-500/50"
+                                                        type="number" min="0"
+                                                        value={newVarCost}
+                                                        onChange={e => setNewVarCost(e.target.value)}
+                                                        className="w-full bg-app-card border border-app-border rounded-lg px-3 py-2 text-sm text-app-text font-bold focus:outline-none focus:border-violet-500/50"
                                                     />
                                                 </div>
                                                 <div>

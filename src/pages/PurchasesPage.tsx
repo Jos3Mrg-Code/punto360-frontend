@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { printPurchaseReceipt, getPaperWidth, type ReceiptHeader } from "../lib/receipt";
 import NewProductFields, { type SavedProduct } from "../components/products/NewProductFields";
+import { buildShortVariantSku, cartesian, sortVariantsByAttributes } from "../utils/skuUtils";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface Supplier { id: string; name: string; phone?: string; creditBalance?: number; }
@@ -104,13 +105,14 @@ export default function PurchasesPage() {
     const [variantPickerProduct, setVariantPickerProduct] = useState<Product | null>(null);
     const [variantEntries, setVariantEntries] = useState<VariantEntry[]>([]);
     const [loadingVariants, setLoadingVariants] = useState(false);
+    const [variantSearch, setVariantSearch] = useState("");
 
     // Nueva variante inline
     interface ProductAttribute { id: string; name: string; values: { id: string; value: string }[] }
     const [productAttributes, setProductAttributes] = useState<ProductAttribute[]>([]);
     const [showNewVariantForm, setShowNewVariantForm] = useState(false);
     const [newVariantAttrs, setNewVariantAttrs] = useState<Record<string, string>>({});
-    const [newVariantSku, setNewVariantSku] = useState("");
+    const [newVariantCostPrice, setNewVariantCostPrice] = useState("");
     const [newVariantSalePrice, setNewVariantSalePrice] = useState("");
     const [savingNewVariant, setSavingNewVariant] = useState(false);
 
@@ -322,14 +324,15 @@ export default function PurchasesPage() {
             setLoadingVariants(true);
             setShowNewVariantForm(false);
             setNewVariantAttrs({});
-            setNewVariantSku("");
+            setVariantSearch("");
+            setNewVariantCostPrice(String(product.cost_price ?? 0));
             setNewVariantSalePrice(String(product.sale_price ?? 0));
             try {
                 const [varRes, attrRes] = await Promise.all([
                     api.get(`/products/${product.id}/variants`),
                     api.get(`/products/${product.id}/attributes`),
                 ]);
-                const loaded: VariantOption[] = varRes.data.map((v: any) => ({
+                const loaded: VariantOption[] = sortVariantsByAttributes(varRes.data).map((v: any) => ({
                     ...v,
                     stockCount: (v.stock ?? []).reduce((sum: number, s: any) => sum + Number(s.quantity), 0),
                 }));
@@ -373,50 +376,90 @@ export default function PurchasesPage() {
 
     const handleCreateVariant = async () => {
         if (!variantPickerProduct) return;
-        const missing = productAttributes.filter(a => !newVariantAttrs[a.id]?.trim());
-        if (missing.length > 0) { toast.warning(`Completa el campo: ${missing.map(a => a.name).join(", ")}`); return; }
-        if (!newVariantSku.trim()) { toast.warning("El SKU es requerido"); return; }
+        // Cada atributo acepta varios valores separados por coma (ej. "35,36,37")
+        const parsedAttrs = productAttributes.map(attr => ({
+            attr,
+            values: (newVariantAttrs[attr.id] ?? "").split(",").map(v => v.trim()).filter(Boolean),
+        }));
+        const missing = parsedAttrs.filter(p => p.values.length === 0);
+        if (missing.length > 0) { toast.warning(`Completa el campo: ${missing.map(p => p.attr.name).join(", ")}`); return; }
         if (!newVariantSalePrice || Number(newVariantSalePrice) <= 0) { toast.warning("El precio de venta es requerido"); return; }
 
         setSavingNewVariant(true);
         try {
-            const attrValueIds: string[] = [];
-            for (const attr of productAttributes) {
-                const typed = newVariantAttrs[attr.id].trim();
-                const existing = attr.values.find(v => v.value.toLowerCase() === typed.toLowerCase());
-                if (existing) {
-                    attrValueIds.push(existing.id);
-                } else {
-                    const res = await api.post(`/products/${variantPickerProduct.id}/attributes/${attr.id}/values`, { value: typed });
-                    attrValueIds.push(res.data.id);
-                    setProductAttributes(prev => prev.map(a => a.id === attr.id
-                        ? { ...a, values: [...a.values, { id: res.data.id, value: typed }] }
-                        : a
-                    ));
+            // Resolver (o crear) cada valor escrito, por atributo
+            const idsByAttr: string[][] = [];
+            for (const { attr, values } of parsedAttrs) {
+                const ids: string[] = [];
+                let knownValues = attr.values;
+                for (const typed of values) {
+                    const existing = knownValues.find(v => v.value.toLowerCase() === typed.toLowerCase());
+                    if (existing) {
+                        ids.push(existing.id);
+                    } else {
+                        const res = await api.post(`/products/${variantPickerProduct.id}/attributes/${attr.id}/values`, { value: typed });
+                        knownValues = [...knownValues, { id: res.data.id, value: typed }];
+                        ids.push(res.data.id);
+                        setProductAttributes(prev => prev.map(a => a.id === attr.id ? { ...a, values: knownValues } : a));
+                    }
                 }
+                idsByAttr.push(ids);
             }
-            const varRes = await api.post(`/products/${variantPickerProduct.id}/variants`, {
-                sku: newVariantSku.trim(),
-                sale_price: Number(newVariantSalePrice),
-                attribute_value_ids: attrValueIds,
-                stock: 0,
+
+            // Combinaciones (producto cartesiano) entre los valores de cada atributo
+            const idCombos = cartesian(idsByAttr);
+            const labelCombos = cartesian(parsedAttrs.map(p => p.values));
+
+            const existingSkus = new Set(variantEntries.map(e => e.sku.toUpperCase()));
+            const usedSkus = new Set<string>();
+            const variantsPayload = idCombos.map((valueIds, i) => {
+                let sku = buildShortVariantSku(variantPickerProduct.sku, labelCombos[i]);
+                if (usedSkus.has(sku) || existingSkus.has(sku.toUpperCase())) {
+                    let n = 2;
+                    while (usedSkus.has(`${sku}${n}`) || existingSkus.has(`${sku}${n}`.toUpperCase())) n++;
+                    sku = `${sku}${n}`;
+                }
+                usedSkus.add(sku);
+                return {
+                    sku,
+                    sale_price: Number(newVariantSalePrice),
+                    cost_price: Number(newVariantCostPrice) || 0,
+                    attribute_value_ids: valueIds,
+                    stock: 0,
+                };
             });
-            const newV = varRes.data;
-            const label = productAttributes.map(a => `${a.name}: ${newVariantAttrs[a.id]}`).join(" / ");
-            const newEntry: VariantEntry = {
-                variantId: newV.id,
-                label,
-                sku: newV.sku,
-                quantity: "",
-                cost: String(variantPickerProduct.cost_price ?? 0),
-                salePrice: newVariantSalePrice,
-                stockCount: 0,
-            };
-            setVariantEntries(prev => [...prev, newEntry]);
+
+            const res = await api.post(`/products/${variantPickerProduct.id}/variants/batch`, { variants: variantsPayload });
+            const { created, errors, duplicateSkus } = res.data as { created: number; errors: number; duplicateSkus: string[] };
+
+            // Releer variantes del producto para reflejar lo creado con datos reales
+            const varRes = await api.get(`/products/${variantPickerProduct.id}/variants`);
+            const loaded: VariantOption[] = sortVariantsByAttributes(varRes.data).map((v: any) => ({
+                ...v,
+                stockCount: (v.stock ?? []).reduce((sum: number, s: any) => sum + Number(s.quantity), 0),
+            }));
+            setVariantPickerProduct(prev => (prev ? { ...prev, variants: loaded } : prev));
+            setVariantEntries(prev => loaded.map(v => {
+                const existingEntry = prev.find(e => e.variantId === v.id);
+                if (existingEntry) return existingEntry;
+                return {
+                    variantId: v.id,
+                    label: variantLabel(v),
+                    sku: v.sku,
+                    quantity: "",
+                    cost: String(v.cost_price ?? 0),
+                    salePrice: String(v.sale_price ?? 0),
+                    stockCount: v.stockCount,
+                };
+            }));
+
+            if (errors === 0) {
+                toast.success(`${created} variante${created !== 1 ? "s" : ""} creada${created !== 1 ? "s" : ""}`);
+            } else {
+                toast.warning(`${created} creada${created !== 1 ? "s" : ""}. ${errors} SKU${errors !== 1 ? "s" : ""} ya existía${errors !== 1 ? "n" : ""}: ${duplicateSkus.join(", ")}`);
+            }
             setShowNewVariantForm(false);
             setNewVariantAttrs({});
-            setNewVariantSku("");
-            toast.success("Variante creada");
         } catch (err: any) {
             toast.error(err?.response?.data?.message ?? "Error al crear la variante");
         } finally {
@@ -453,6 +496,7 @@ export default function PurchasesPage() {
         setItems([...updatedItems, ...newItems]);
         setVariantPickerProduct(null);
         setVariantEntries([]);
+        setVariantSearch("");
     };
 
     const updateItem = (idx: number, field: "quantity" | "cost" | "salePrice", value: number) => {
@@ -702,7 +746,7 @@ export default function PurchasesPage() {
             {/* ── Modal ingreso de variantes ── */}
             {variantPickerProduct && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-                    <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setVariantPickerProduct(null)} />
+                    <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => { setVariantPickerProduct(null); setVariantSearch(""); }} />
                     <div className="relative w-full max-w-2xl bg-app-card border border-app-border rounded-2xl shadow-2xl z-10 flex flex-col max-h-[90vh]">
 
                         {/* Header */}
@@ -720,7 +764,21 @@ export default function PurchasesPage() {
                                 <p className="text-center text-sm text-app-text-muted py-8">Este producto aún no tiene variantes creadas.</p>
                             ) : (
                                 <div className="space-y-3">
-                                    {variantEntries.map((entry, idx) => (
+                                    {variantEntries.length > 1 && (
+                                        <div className="relative mb-1">
+                                            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-app-text-muted" />
+                                            <input
+                                                value={variantSearch}
+                                                onChange={e => setVariantSearch(e.target.value)}
+                                                placeholder="Filtrar por talla, color..."
+                                                className="w-full bg-app-bg border border-app-border rounded-lg pl-8 pr-3 py-2 text-xs text-app-text focus:outline-none focus:ring-1 focus:ring-violet-500/40"
+                                            />
+                                        </div>
+                                    )}
+                                    {variantEntries
+                                        .map((entry, idx) => ({ entry, idx }))
+                                        .filter(({ entry }) => !variantSearch.trim() || entry.label.toLowerCase().includes(variantSearch.trim().toLowerCase()))
+                                        .map(({ entry, idx }) => (
                                         <div key={entry.variantId} className="bg-app-bg border border-app-border rounded-xl px-3 py-3">
                                             {/* Atributos de la variante — cada uno en su propio chip */}
                                             <div className="flex items-start justify-between gap-3 mb-2.5">
@@ -785,7 +843,10 @@ export default function PurchasesPage() {
                                     </button>
                                 ) : (
                                     <div className="bg-app-bg border border-violet-500/30 rounded-xl p-4 space-y-3">
-                                        <p className="text-xs font-bold text-violet-300 uppercase tracking-wide">Nueva variante</p>
+                                        <div>
+                                            <p className="text-xs font-bold text-violet-300 uppercase tracking-wide">Nueva variante</p>
+                                            <p className="text-[10px] text-app-text-muted mt-0.5">Separa varios valores con coma para crear combinaciones (ej: 35,36,37). El SKU se genera automático.</p>
+                                        </div>
                                         {productAttributes.map(attr => (
                                             <div key={attr.id}>
                                                 <label className="text-[10px] font-bold text-app-text-muted uppercase tracking-widest mb-1 block">{attr.name}</label>
@@ -793,7 +854,7 @@ export default function PurchasesPage() {
                                                     list={`attr-list-${attr.id}`}
                                                     value={newVariantAttrs[attr.id] ?? ""}
                                                     onChange={e => setNewVariantAttrs(prev => ({ ...prev, [attr.id]: e.target.value }))}
-                                                    placeholder={`Ej: ${attr.values[0]?.value ?? attr.name}`}
+                                                    placeholder={`Ej: ${attr.values[0]?.value ?? attr.name}, ...`}
                                                     className="w-full bg-app-card border border-app-border rounded-lg px-3 py-2 text-sm text-app-text focus:outline-none focus:ring-1 focus:ring-violet-500/40"
                                                 />
                                                 <datalist id={`attr-list-${attr.id}`}>
@@ -803,12 +864,12 @@ export default function PurchasesPage() {
                                         ))}
                                         <div className="grid grid-cols-2 gap-3">
                                             <div>
-                                                <label className="text-[10px] font-bold text-app-text-muted uppercase tracking-widest mb-1 block">SKU</label>
+                                                <label className="text-[10px] font-bold text-app-text-muted uppercase tracking-widest mb-1 block">P. Costo</label>
                                                 <input
-                                                    value={newVariantSku}
-                                                    onChange={e => setNewVariantSku(e.target.value)}
-                                                    placeholder="SKU único"
-                                                    className="w-full bg-app-card border border-app-border rounded-lg px-3 py-2 text-sm text-app-text font-mono focus:outline-none focus:ring-1 focus:ring-violet-500/40"
+                                                    type="number" min="0"
+                                                    value={newVariantCostPrice}
+                                                    onChange={e => setNewVariantCostPrice(e.target.value)}
+                                                    className="w-full bg-app-card border border-app-border rounded-lg px-3 py-2 text-sm text-app-text font-bold focus:outline-none focus:ring-1 focus:ring-violet-500/40"
                                                 />
                                             </div>
                                             <div>
@@ -843,7 +904,7 @@ export default function PurchasesPage() {
                         {/* Footer */}
                         <div className="flex gap-3 px-6 py-4 border-t border-app-border">
                             <button
-                                onClick={() => { setVariantPickerProduct(null); setVariantEntries([]); }}
+                                onClick={() => { setVariantPickerProduct(null); setVariantEntries([]); setVariantSearch(""); }}
                                 className="flex-1 py-2.5 rounded-xl border border-app-border text-app-text-muted text-sm hover:text-app-text transition-colors"
                             >
                                 Cancelar
