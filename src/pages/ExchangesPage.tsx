@@ -158,6 +158,7 @@ export default function ExchangesPage() {
   const [retVariant, setRetVariant] = useState<Variant | null>(null);
   const [retPrice, setRetPrice] = useState("");
 
+  const [isRefundOnly, setIsRefundOnly] = useState(false);
   const [newProduct, setNewProduct] = useState<Product | null>(null);
   const [newVariant, setNewVariant] = useState<Variant | null>(null);
   const [newPrice, setNewPrice] = useState("");
@@ -182,7 +183,7 @@ export default function ExchangesPage() {
   }, [newVariant, newProduct]);
 
   const retPriceNum = parseFloat(retPrice) || 0;
-  const newPriceNum = parseFloat(newPrice) || 0;
+  const newPriceNum = isRefundOnly ? 0 : (parseFloat(newPrice) || 0);
   const difference = newPriceNum - retPriceNum;
 
   const retReady = isExternal
@@ -191,12 +192,12 @@ export default function ExchangesPage() {
 
   const canSubmit =
     retReady &&
-    newProduct &&
-    (!newProduct.has_variants || newVariant) &&
-    newPriceNum > 0;
+    (isRefundOnly ||
+      (newProduct && (!newProduct.has_variants || newVariant) && newPriceNum > 0));
 
   const handleSubmit = async () => {
-    if (!canSubmit || !newProduct) return;
+    if (!canSubmit) return;
+    if (!isRefundOnly && !newProduct) return;
     setIsSaving(true);
     try {
       await api.post("/exchanges", {
@@ -206,23 +207,24 @@ export default function ExchangesPage() {
         returnedProductName: isExternal ? retExternalName.trim() : undefined,
         returnedQuantity: 1,
         returnedPrice: retPriceNum,
-        newProductId: newProduct.id,
-        newVariantId: newVariant?.id,
-        newQuantity: 1,
-        newPrice: newPriceNum,
+        newProductId: isRefundOnly ? undefined : newProduct?.id,
+        newVariantId: isRefundOnly ? undefined : newVariant?.id,
+        newQuantity: isRefundOnly ? undefined : 1,
+        newPrice: isRefundOnly ? undefined : newPriceNum,
         paymentMethod: difference !== 0 ? payMethod : null,
         notes: notes || null,
       });
       // Reset
       setIsExternal(false); setRetExternalName("");
       setRetProduct(null); setRetVariant(null); setRetPrice("");
+      setIsRefundOnly(false);
       setNewProduct(null); setNewVariant(null); setNewPrice("");
       setNotes(""); setPayMethod("CASH");
-      setSuccessMsg("Cambio registrado correctamente");
+      setSuccessMsg(isRefundOnly ? "Devolución registrada correctamente" : "Cambio registrado correctamente");
       setTimeout(() => setSuccessMsg(""), 4000);
       fetchHistory();
     } catch (e: any) {
-      alert(e?.response?.data?.message ?? "Error al registrar el cambio");
+      alert(e?.response?.data?.message ?? "Error al registrar el movimiento");
     } finally {
       setIsSaving(false);
     }
@@ -238,8 +240,8 @@ export default function ExchangesPage() {
               <ArrowLeftRight size={26} />
             </div>
             <div>
-              <h1 className="text-2xl font-black text-app-text">Cambio de Producto</h1>
-              <p className="text-app-text-muted text-sm">Registra cambios sin necesidad de venta en el sistema</p>
+              <h1 className="text-2xl font-black text-app-text">Cambios y Devoluciones</h1>
+              <p className="text-app-text-muted text-sm">Registra cambios de producto o devoluciones de dinero</p>
             </div>
           </div>
           <button onClick={() => { setShowHistory(h => !h); if (!showHistory) fetchHistory(); }}
@@ -282,9 +284,15 @@ export default function ExchangesPage() {
                       </div>
                       <div className="flex justify-center"><ArrowRight size={14} className="text-app-text-muted" /></div>
                       <div className="min-w-0">
-                        <p className="text-xs text-emerald-400 font-bold truncate">↗ {e.newProduct?.name ?? '—'}</p>
-                        {e.newVariant && <p className="text-[10px] text-emerald-400/60">{e.newVariant.label}</p>}
-                        <p className="text-[10px] text-app-text-muted">{cop(Number(e.new_price))}</p>
+                        {e.newProduct ? (
+                          <>
+                            <p className="text-xs text-emerald-400 font-bold truncate">↗ {e.newProduct.name}</p>
+                            {e.newVariant && <p className="text-[10px] text-emerald-400/60">{e.newVariant.label}</p>}
+                            <p className="text-[10px] text-app-text-muted">{cop(Number(e.new_price))}</p>
+                          </>
+                        ) : (
+                          <p className="text-xs text-sky-400 font-bold truncate">💰 Reembolso en dinero</p>
+                        )}
                       </div>
                     </div>
                     <div className="text-right shrink-0">
@@ -363,32 +371,53 @@ export default function ExchangesPage() {
             )}
           </div>
 
-          {/* Producto nuevo */}
+          {/* Producto nuevo / devolución de dinero */}
           <div className="bg-app-card border border-emerald-500/20 rounded-2xl p-6 space-y-4">
-            <div className="flex items-center gap-2 mb-1">
-              <div className="w-2 h-2 rounded-full bg-emerald-400" />
-              <p className="font-black text-app-text text-sm uppercase tracking-wider">Producto que se lleva</p>
+            <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-emerald-400" />
+                <p className="font-black text-app-text text-sm uppercase tracking-wider">Producto que se lleva</p>
+              </div>
+              <button
+                onClick={() => { setIsRefundOnly(r => !r); setNewProduct(null); setNewVariant(null); setNewPrice(""); }}
+                className={`text-[11px] font-bold px-3 py-1 rounded-lg border transition-all ${isRefundOnly ? 'bg-sky-500/20 border-sky-500/40 text-sky-400' : 'bg-app-bg border-app-border text-app-text-muted hover:text-app-text'}`}>
+                {isRefundOnly ? '✕ Solo dinero' : 'Solo devolver dinero'}
+              </button>
             </div>
-            <ProductSelector
-              label="Buscar producto nuevo"
-              products={products}
-              value={newProduct}
-              variant={newVariant}
-              onSelect={p => { setNewProduct(p); setNewVariant(null); setNewPrice(p ? (p.has_variants ? "" : String(p.sale_price)) : ""); }}
-              onVariantSelect={v => { setNewVariant(v); if (v) setNewPrice(String(v.sale_price)); }}
-            />
-            {newProduct && (!newProduct.has_variants || newVariant) && (
-              <div>
-                <label className="text-[11px] font-black uppercase text-app-text-muted tracking-wider">Precio del producto nuevo</label>
-                <div className="flex items-center gap-2 mt-1.5 bg-app-bg border border-app-border rounded-xl px-3 py-2.5">
-                  <DollarSign size={14} className="text-app-text-muted shrink-0" />
-                  <input
-                    type="number" value={newPrice} onChange={e => setNewPrice(e.target.value)}
-                    placeholder="0"
-                    className="bg-transparent text-sm text-app-text flex-1 focus:outline-none"
-                  />
+
+            {isRefundOnly ? (
+              <div className="rounded-xl p-4 border border-sky-500/30 bg-sky-500/10 flex items-center gap-3">
+                <DollarSign size={20} className="text-sky-400 shrink-0" />
+                <div>
+                  <p className="text-xs font-black uppercase text-sky-400 tracking-wider">Se reembolsará al cliente</p>
+                  <p className="text-lg font-black text-app-text">{cop(retPriceNum)}</p>
+                  <p className="text-[10px] text-app-text-muted mt-0.5">Sin producto nuevo — el stock devuelto se reingresa igual</p>
                 </div>
               </div>
+            ) : (
+              <>
+                <ProductSelector
+                  label="Buscar producto nuevo"
+                  products={products}
+                  value={newProduct}
+                  variant={newVariant}
+                  onSelect={p => { setNewProduct(p); setNewVariant(null); setNewPrice(p ? (p.has_variants ? "" : String(p.sale_price)) : ""); }}
+                  onVariantSelect={v => { setNewVariant(v); if (v) setNewPrice(String(v.sale_price)); }}
+                />
+                {newProduct && (!newProduct.has_variants || newVariant) && (
+                  <div>
+                    <label className="text-[11px] font-black uppercase text-app-text-muted tracking-wider">Precio del producto nuevo</label>
+                    <div className="flex items-center gap-2 mt-1.5 bg-app-bg border border-app-border rounded-xl px-3 py-2.5">
+                      <DollarSign size={14} className="text-app-text-muted shrink-0" />
+                      <input
+                        type="number" value={newPrice} onChange={e => setNewPrice(e.target.value)}
+                        placeholder="0"
+                        className="bg-transparent text-sm text-app-text flex-1 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>
@@ -407,7 +436,9 @@ export default function ExchangesPage() {
                 <ArrowLeftRight size={20} className={difference > 0 ? 'text-emerald-400' : difference < 0 ? 'text-rose-400' : 'text-app-text-muted'} />
                 <div>
                   <p className="text-xs font-black uppercase text-app-text-muted tracking-wider">
-                    {difference > 0 ? 'El cliente paga la diferencia' : difference < 0 ? 'La tienda devuelve la diferencia' : 'Cambio parejo — sin diferencia'}
+                    {isRefundOnly
+                      ? 'La tienda devuelve el dinero'
+                      : (difference > 0 ? 'El cliente paga la diferencia' : difference < 0 ? 'La tienda devuelve la diferencia' : 'Cambio parejo — sin diferencia')}
                   </p>
                   <p className={`text-2xl font-black ${difference > 0 ? 'text-emerald-400' : difference < 0 ? 'text-rose-400' : 'text-app-text-muted'}`}>
                     {difference > 0 ? '+' : ''}{cop(difference)}
@@ -416,7 +447,7 @@ export default function ExchangesPage() {
               </div>
               <div className="text-right text-xs text-app-text-muted space-y-1">
                 <p>Devuelto: <span className="font-bold text-app-text">{cop(retPriceNum)}</span></p>
-                <p>Nuevo: <span className="font-bold text-app-text">{cop(newPriceNum)}</span></p>
+                {!isRefundOnly && <p>Nuevo: <span className="font-bold text-app-text">{cop(newPriceNum)}</span></p>}
               </div>
             </div>
 
@@ -424,7 +455,7 @@ export default function ExchangesPage() {
             {difference !== 0 && (
               <div>
                 <p className="text-[11px] font-black uppercase text-app-text-muted tracking-wider mb-2">
-                  {difference > 0 ? 'Método de pago del cliente' : 'Método de devolución'}
+                  {isRefundOnly ? 'Método de devolución del dinero' : (difference > 0 ? 'Método de pago del cliente' : 'Método de devolución')}
                 </p>
                 <div className="flex gap-2">
                   {[{ k: 'CASH', label: 'Efectivo', icon: <Banknote size={14} /> }, { k: 'CARD', label: 'Tarjeta', icon: <CreditCard size={14} /> }, { k: 'TRANSFER', label: 'Transferencia', icon: <Building2 size={14} /> }].map(m => (
@@ -449,7 +480,7 @@ export default function ExchangesPage() {
             <button onClick={handleSubmit} disabled={isSaving}
               className="w-full py-3 bg-app-accent text-white font-black rounded-xl hover:opacity-90 transition-all flex items-center justify-center gap-2 disabled:opacity-50">
               {isSaving ? <Loader2 size={18} className="animate-spin" /> : <CheckCircle2 size={18} />}
-              {isSaving ? "Registrando..." : "Confirmar Cambio"}
+              {isSaving ? "Registrando..." : (isRefundOnly ? "Confirmar Devolución" : "Confirmar Cambio")}
             </button>
           </div>
         )}
