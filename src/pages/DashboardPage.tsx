@@ -4,7 +4,7 @@ import { api } from "../api/axios";
 import {
   Wallet, ShoppingBag, DollarSign,
   AlertTriangle, Package, Loader2, CheckCircle2, CreditCard, Building2,
-  ChevronRight, ArrowUpRight, ShoppingCart
+  ChevronRight, ArrowUpRight, ShoppingCart, SplitSquareHorizontal
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
@@ -36,12 +36,14 @@ const paymentIcon: Record<string, React.ReactElement> = {
   CASH: <Wallet size={14} className="text-emerald-400" />,
   CARD: <CreditCard size={14} className="text-blue-400" />,
   TRANSFER: <Building2 size={14} className="text-violet-400" />,
+  MIXED: <SplitSquareHorizontal size={14} className="text-amber-400" />,
 };
 
 const paymentLabel: Record<string, string> = {
   CASH: "Efectivo",
   CARD: "Tarjeta",
   TRANSFER: "Transferencia",
+  MIXED: "Mixto",
 };
 
 export default function DashboardPage() {

@@ -27,6 +27,8 @@ export interface ReceiptData {
   items: ReceiptItem[];
   total: number;
   paymentMethod: string;
+  /** Desglose cuando el pago fue mixto (paymentMethod === 'MIXED') */
+  payments?: { method: string; amount: number }[];
   change?: number;
   cashReceived?: number;
   customerName?: string | null;
@@ -43,6 +45,7 @@ const PAY_LABEL: Record<string, string> = {
   CARD: 'Tarjeta',
   TRANSFER: 'Transferencia',
   CREDIT: 'Crédito',
+  MIXED: 'Mixto',
 };
 
 const SALE_TYPE_LABEL: Record<string, string> = {
@@ -101,7 +104,9 @@ export function buildReceiptHtml(
     `).join('')}
     <div class="line"></div>
     <div class="row total"><span>TOTAL</span><span>${money(d.total)}</span></div>
-    <div class="row small"><span>Pago</span><span>${esc(PAY_LABEL[d.paymentMethod] ?? d.paymentMethod)}</span></div>
+    ${d.paymentMethod === 'MIXED' && d.payments?.length
+      ? d.payments.map(p => `<div class="row small"><span>${esc(PAY_LABEL[p.method] ?? p.method)}</span><span>${money(p.amount)}</span></div>`).join('')
+      : `<div class="row small"><span>Pago</span><span>${esc(PAY_LABEL[d.paymentMethod] ?? d.paymentMethod)}</span></div>`}
     ${d.paymentMethod === 'CASH' && d.cashReceived ? `<div class="row small"><span>Recibido</span><span>${money(d.cashReceived)}</span></div>` : ''}
     ${d.paymentMethod === 'CASH' && d.change && d.change > 0 ? `<div class="row small"><span>Cambio</span><span>${money(d.change)}</span></div>` : ''}
     ${d.customerName ? `<div class="row small"><span>Cliente</span><span>${esc(d.customerName)}</span></div>` : ''}

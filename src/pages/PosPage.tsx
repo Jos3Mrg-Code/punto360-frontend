@@ -3,7 +3,7 @@ import { scannerNormalize } from "../utils/scannerFix";
 import { useEffect, useState, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { printReceipt, formatSaleNumber, getPaperWidth, PAPER_WIDTH_KEY, type ReceiptHeader } from "../lib/receipt";
-import { ShoppingCart, Search, CreditCard, Banknote, Building2, Plus, Minus, Trash2, CheckCircle2, Loader2, AlertTriangle, TrendingUp, Receipt, Wallet, UserCheck, X, Pause, Clock, Layers, ScanLine } from "lucide-react";
+import { ShoppingCart, Search, CreditCard, Banknote, Building2, Plus, Minus, Trash2, CheckCircle2, Loader2, AlertTriangle, TrendingUp, Receipt, Wallet, UserCheck, X, Pause, Clock, Layers, ScanLine, SplitSquareHorizontal } from "lucide-react";
 import { api } from "../api/axios";
 import { useAuth } from "../auth/AuthContext";
 import BarcodeScannerModal from "../components/ui/BarcodeScannerModal";
@@ -71,7 +71,8 @@ export default function PosPage() {
   const [products, setProducts] = useState<ProductRow[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [cart, setCart] = useState<CartItem[]>([]);
-  const [paymentMethod, setPaymentMethod] = useState<"CASH" | "CARD" | "TRANSFER" | "CREDIT">("CASH");
+  const [paymentMethod, setPaymentMethod] = useState<"CASH" | "CARD" | "TRANSFER" | "CREDIT" | "MIXED">("CASH");
+  const [splitAmounts, setSplitAmounts] = useState<{ CASH: string; CARD: string; TRANSFER: string }>({ CASH: "", CARD: "", TRANSFER: "" });
   const [customerSearch, setCustomerSearch] = useState("");
   const [customers, setCustomers] = useState<CustomerOption[]>([]);
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerOption | null>(null);
@@ -96,7 +97,7 @@ export default function PosPage() {
   const [pendingSales, setPendingSales] = useState<any[]>([]);
   const [showPending, setShowPending] = useState(false);
   const [variantPrompt, setVariantPrompt] = useState<{ product: ProductRow; variants: VariantOption[] } | null>(null);
-  const [printData, setPrintData] = useState<{ items: CartItem[]; total: number; change: number; cashReceived?: number; paymentMethod: string; customerName?: string; saleNumber: number | null; date: Date; saleType?: string } | null>(null);
+  const [printData, setPrintData] = useState<{ items: CartItem[]; total: number; change: number; cashReceived?: number; paymentMethod: string; payments?: { method: string; amount: number }[]; customerName?: string; saleNumber: number | null; date: Date; saleType?: string } | null>(null);
   const [paperWidth, setPaperWidth] = useState<number>(getPaperWidth);
   const [receiptInfo, setReceiptInfo] = useState<ReceiptHeader | null>(null);
   const variantMap = useRef<Record<string, VariantMapEntry>>({});
@@ -411,10 +412,23 @@ export default function PosPage() {
     return received - cartTotal;
   }, [cashReceived, cartTotal]);
 
+  // Pago mixto: desglose por método, debe sumar exacto al total del carrito
+  const splitEntries = useMemo(() => {
+    return (["CASH", "CARD", "TRANSFER"] as const)
+      .map(method => ({ method, amount: parseFloat(splitAmounts[method]) || 0 }))
+      .filter(p => p.amount > 0);
+  }, [splitAmounts]);
+  const splitSum = useMemo(() => splitEntries.reduce((s, p) => s + p.amount, 0), [splitEntries]);
+  const splitValid = paymentMethod === 'MIXED' && splitEntries.length >= 2 && Math.abs(splitSum - cartTotal) < 1;
+
   const handleCheckout = async () => {
     if (cart.length === 0) return;
     if (paymentMethod === 'CREDIT' && !selectedCustomer) {
       toast.warning("Selecciona un cliente para registrar una venta a crédito.");
+      return;
+    }
+    if (paymentMethod === 'MIXED' && !splitValid) {
+      toast.warning("La suma de los métodos de pago debe ser igual al total.");
       return;
     }
     setIsProcessing(true);
@@ -429,6 +443,9 @@ export default function PosPage() {
         total: cartTotal,
         paymentMethod,
       };
+      if (paymentMethod === 'MIXED') {
+        payload.payments = splitEntries;
+      }
       if (paymentMethod === 'CREDIT' && selectedCustomer) {
         payload.customerId = selectedCustomer.id;
       }
@@ -443,6 +460,7 @@ export default function PosPage() {
         change,
         cashReceived: isNaN(received) ? undefined : received,
         paymentMethod,
+        payments: paymentMethod === 'MIXED' ? splitEntries : undefined,
         customerName: selectedCustomer?.name,
         // Consecutivo y fecha vienen del backend: la factura debe reflejar
         // el momento de la venta, no el de la impresión
@@ -452,6 +470,7 @@ export default function PosPage() {
       });
       setCart([]);
       setCashReceived("");
+      setSplitAmounts({ CASH: "", CARD: "", TRANSFER: "" });
       setSelectedCustomer(null);
       setCustomerSearch("");
       fetchProducts();
@@ -661,9 +680,10 @@ export default function PosPage() {
                 { key: "CARD",     label: "Tarjeta",  icon: <CreditCard size={14} /> },
                 { key: "TRANSFER", label: "Transf.",  icon: <Building2 size={14} /> },
                 { key: "CREDIT",   label: "Crédito",  icon: <UserCheck size={14} /> },
+                { key: "MIXED",    label: "Mixto",    icon: <SplitSquareHorizontal size={14} /> },
               ] as const).map(m => (
                 <button key={m.key}
-                  onClick={() => { setPaymentMethod(m.key); setSelectedCustomer(null); setCustomerSearch(""); }}
+                  onClick={() => { setPaymentMethod(m.key); setSelectedCustomer(null); setCustomerSearch(""); setSplitAmounts({ CASH: "", CARD: "", TRANSFER: "" }); }}
                   className={`flex flex-col items-center px-3 py-2 rounded-lg transition-all ${paymentMethod === m.key ? 'bg-app-accent text-white shadow-lg shadow-app-accent/20 scale-105' : 'text-app-text-muted hover:bg-app-accent/10'}`}>
                   {m.icon}
                   <span className="text-[9px] font-black uppercase tracking-tighter mt-1">{m.label}</span>
@@ -754,6 +774,32 @@ export default function PosPage() {
               </div>
             )}
 
+            {/* Pago mixto — desglose por método, debe sumar el total */}
+            {paymentMethod === 'MIXED' && cartTotal > 0 && (
+              <div className="flex items-end gap-2 shrink-0 animate-in slide-in-from-left-2 duration-200">
+                {([
+                  { key: "CASH" as const,     label: "Efvo.",  icon: <Banknote size={12} /> },
+                  { key: "CARD" as const,     label: "Tarj.",  icon: <CreditCard size={12} /> },
+                  { key: "TRANSFER" as const, label: "Transf.", icon: <Building2 size={12} /> },
+                ]).map(m => (
+                  <div key={m.key}>
+                    <div className="flex items-center gap-1 text-[9px] font-black text-app-text-muted uppercase tracking-widest mb-1">{m.icon}{m.label}</div>
+                    <div className="relative">
+                      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-app-accent font-bold text-xs">$</span>
+                      <input type="number" value={splitAmounts[m.key]}
+                        onChange={(e) => setSplitAmounts(prev => ({ ...prev, [m.key]: e.target.value }))}
+                        placeholder="0"
+                        className="w-24 bg-app-bg border border-app-accent/30 rounded-lg pl-5 pr-2 py-1.5 text-right text-app-accent font-black text-sm focus:outline-none focus:ring-2 focus:ring-app-accent/20" />
+                    </div>
+                  </div>
+                ))}
+                <div className={`px-3 py-1.5 rounded-xl border mb-0.5 ${splitValid ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-rose-500/10 border-rose-500/20'}`}>
+                  <div className={`text-[9px] font-black uppercase tracking-widest ${splitValid ? 'text-emerald-500' : 'text-rose-400'}`}>{splitValid ? 'Completo' : 'Falta'}</div>
+                  <div className={`text-sm font-black ${splitValid ? 'text-emerald-500' : 'text-rose-400'}`}>${Math.abs(cartTotal - splitSum).toLocaleString()}</div>
+                </div>
+              </div>
+            )}
+
             {/* A pagar + botón cobrar */}
             <div className="flex items-center gap-4 ml-auto shrink-0">
               <div className="text-right">
@@ -761,8 +807,8 @@ export default function PosPage() {
                 <div className="text-3xl font-black text-app-text">${cartTotal.toLocaleString()}</div>
               </div>
               <button onClick={handleCheckout}
-                disabled={cart.length === 0 || isProcessing || (paymentMethod === 'CASH' && (parseFloat(cashReceived) < cartTotal || !cashReceived)) || (paymentMethod === 'CREDIT' && !selectedCustomer)}
-                className={`px-8 py-4 rounded-xl font-black uppercase tracking-[0.2em] flex items-center gap-2 transition-all shadow-xl text-base ${cart.length === 0 || (paymentMethod === 'CASH' && parseFloat(cashReceived) < cartTotal) || (paymentMethod === 'CREDIT' && !selectedCustomer) ? 'bg-app-accent/5 text-app-text-muted cursor-not-allowed border border-app-border' : 'bg-app-accent hover:bg-app-accent-hover text-white shadow-app-accent/40 active:scale-95'}`}>
+                disabled={cart.length === 0 || isProcessing || (paymentMethod === 'CASH' && (parseFloat(cashReceived) < cartTotal || !cashReceived)) || (paymentMethod === 'CREDIT' && !selectedCustomer) || (paymentMethod === 'MIXED' && !splitValid)}
+                className={`px-8 py-4 rounded-xl font-black uppercase tracking-[0.2em] flex items-center gap-2 transition-all shadow-xl text-base ${cart.length === 0 || (paymentMethod === 'CASH' && parseFloat(cashReceived) < cartTotal) || (paymentMethod === 'CREDIT' && !selectedCustomer) || (paymentMethod === 'MIXED' && !splitValid) ? 'bg-app-accent/5 text-app-text-muted cursor-not-allowed border border-app-border' : 'bg-app-accent hover:bg-app-accent-hover text-white shadow-app-accent/40 active:scale-95'}`}>
                 {isProcessing ? <Loader2 size={22} className="animate-spin" /> : <CheckCircle2 size={22} />}
                 {isProcessing ? "PROCESANDO..." : "COBRAR"}
               </button>
@@ -1098,6 +1144,7 @@ export default function PosPage() {
                     })),
                     total: d.total,
                     paymentMethod: d.paymentMethod,
+                    payments: d.payments,
                     change: d.change,
                     cashReceived: d.cashReceived,
                     customerName: d.customerName,

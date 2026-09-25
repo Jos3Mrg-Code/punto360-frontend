@@ -34,6 +34,7 @@ interface Sale {
     status: string;
     sale_type?: string;
     sale_items: SaleItem[];
+    sale_payments?: { method: string; amount: number }[];
     branches: { name: string; address?: string | null; phone?: string | null };
     customers?: { name: string } | null;
 }
@@ -107,6 +108,7 @@ export default function SalesHistoryPage() {
             })),
             total: Number(sale.total),
             paymentMethod: sale.payment_method,
+            payments: sale.sale_payments?.map(p => ({ method: p.method, amount: Number(p.amount) })),
             customerName: sale.customers?.name,
             saleType: user?.saleTypeEnabled ? sale.sale_type : undefined,
             isReprint: true,
@@ -159,9 +161,19 @@ export default function SalesHistoryPage() {
         const dictionary: Record<string, string> = {
             CASH: 'Efectivo',
             CARD: 'Tarjeta',
-            TRANSFER: 'Transferencia'
+            TRANSFER: 'Transferencia',
+            CREDIT: 'Crédito',
+            MIXED: 'Mixto',
         };
         return dictionary[method] || method;
+    };
+
+    /** "Efectivo $30.000 + Tarjeta $70.000" para una venta con pago mixto */
+    const paymentBreakdown = (sale: Sale) => {
+        if (sale.payment_method !== 'MIXED' || !sale.sale_payments?.length) return null;
+        return sale.sale_payments
+            .map(p => `${translatePayment(p.method)} ${cop(Number(p.amount))}`)
+            .join(' + ');
     };
 
     return (
@@ -336,6 +348,9 @@ export default function SalesHistoryPage() {
                                             </td>
                                             <td className="px-6 py-4 text-[10px] font-black text-app-text uppercase tracking-[0.1em]">
                                                 {translatePayment(sale.payment_method)}
+                                                {paymentBreakdown(sale) && (
+                                                    <div className="text-[9px] font-bold text-app-text-muted normal-case tracking-normal mt-0.5">{paymentBreakdown(sale)}</div>
+                                                )}
                                                 {user?.saleTypeEnabled && sale.sale_type && (
                                                     <span className={`ml-2 px-1.5 py-0.5 rounded text-[8px] font-black uppercase ${sale.sale_type === "RETAIL" ? "bg-app-accent/20 text-app-accent" : "bg-violet-500/20 text-violet-400"}`}>
                                                         {sale.sale_type === "RETAIL" ? "Detal" : "Mayor"}
@@ -436,6 +451,9 @@ export default function SalesHistoryPage() {
                                             </span>
                                         )}
                                         <span className="text-[9px] font-black text-app-text-muted uppercase tracking-widest">{translatePayment(sale.payment_method)}</span>
+                                        {paymentBreakdown(sale) && (
+                                            <span className="text-[8px] font-bold text-app-text-muted">{paymentBreakdown(sale)}</span>
+                                        )}
                                         {user?.saleTypeEnabled && sale.sale_type && (
                                             <span className={`mt-0.5 px-1.5 py-0.5 rounded text-[8px] font-black uppercase ${sale.sale_type === "RETAIL" ? "bg-app-accent/20 text-app-accent" : "bg-violet-500/20 text-violet-400"}`}>
                                                 {sale.sale_type === "RETAIL" ? "Detal" : "Mayor"}
