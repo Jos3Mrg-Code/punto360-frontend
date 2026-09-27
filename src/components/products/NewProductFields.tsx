@@ -849,8 +849,9 @@ export default function NewProductFields({ initialData, onSaveSuccess, onCancel,
 
                   {/* Cabecera */}
                   <div className="grid grid-cols-12 gap-2 px-2 text-[10px] font-bold text-app-text-muted uppercase">
-                    <span className="col-span-3">Combinación</span>
-                    <span className="col-span-3">SKU</span>
+                    <span className="col-span-2">Combinación</span>
+                    <span className="col-span-2">SKU</span>
+                    <span className="col-span-2">Cód. barras</span>
                     <span className="col-span-2 text-center">Costo</span>
                     <span className="col-span-2 text-center">Venta</span>
                     <span className="col-span-1 text-center">Stock</span>
@@ -859,14 +860,21 @@ export default function NewProductFields({ initialData, onSaveSuccess, onCancel,
 
                   {pendingVariants.map((v, idx) => (
                     <div key={idx} className="grid grid-cols-12 gap-2 items-center bg-app-bg border border-violet-500/20 rounded-xl px-3 py-2">
-                      <div className="col-span-3">
+                      <div className="col-span-2">
                         <p className="text-xs font-bold text-violet-300">{v.label}</p>
                       </div>
-                      <div className="col-span-3">
+                      <div className="col-span-2">
                         <input
                           type="text" value={v.sku}
                           onChange={e => updatePending(idx, "sku", e.target.value)}
                           className="w-full bg-app-card border border-app-border rounded-lg px-2 py-1.5 text-xs font-mono text-app-accent focus:outline-none focus:border-violet-500/50"
+                        />
+                      </div>
+                      <div className="col-span-2">
+                        <input
+                          type="text" value={v.barcode} placeholder="Opcional"
+                          onChange={e => updatePending(idx, "barcode", e.target.value)}
+                          className="w-full bg-app-card border border-app-border rounded-lg px-2 py-1.5 text-xs font-mono text-app-text placeholder-app-text-muted/40 focus:outline-none focus:border-violet-500/50"
                         />
                       </div>
                       <div className="col-span-2">
