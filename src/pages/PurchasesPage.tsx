@@ -16,6 +16,7 @@ interface Supplier { id: string; name: string; phone?: string; creditBalance?: n
 interface VariantOption {
     id: string;
     sku: string;
+    barcode?: string | null;
     sale_price: number;
     cost_price: number;
     stockCount: number;
@@ -29,6 +30,7 @@ interface VariantEntry {
     cost: string;
     salePrice: string;
     stockCount: number;
+    barcode: string;
 }
 interface Product {
     id: string;
@@ -348,6 +350,7 @@ export default function PurchasesPage() {
                         cost: snap ? String(snap.cost) : String(v.cost_price ?? 0),
                         salePrice: String(v.sale_price ?? 0),
                         stockCount: v.stockCount,
+                        barcode: v.barcode ?? "",
                     };
                 }));
             } catch {
@@ -450,6 +453,7 @@ export default function PurchasesPage() {
                     cost: String(v.cost_price ?? 0),
                     salePrice: String(v.sale_price ?? 0),
                     stockCount: v.stockCount,
+                    barcode: v.barcode ?? "",
                 };
             }));
 
@@ -824,6 +828,25 @@ export default function PurchasesPage() {
                                                         className="w-full bg-app-card border border-emerald-500/20 rounded-lg px-2 py-1.5 text-sm text-emerald-400 font-bold text-center focus:outline-none focus:ring-1 focus:ring-emerald-500/40"
                                                     />
                                                 </div>
+                                            </div>
+                                            <div className="mt-2">
+                                                <label className="block text-[9px] font-bold text-app-text-muted uppercase tracking-wide mb-0.5">Cód. barras</label>
+                                                <input
+                                                    type="text"
+                                                    placeholder="Opcional"
+                                                    defaultValue={entry.barcode}
+                                                    onBlur={async (e) => {
+                                                        const val = e.target.value.trim();
+                                                        if (val === (entry.barcode ?? "")) return;
+                                                        updateEntry(idx, "barcode", val);
+                                                        if (!variantPickerProduct) return;
+                                                        try {
+                                                            await api.put(`/products/${variantPickerProduct.id}/variants/${entry.variantId}`, { barcode: val || null });
+                                                            toast.success("Código de barras guardado");
+                                                        } catch { toast.error("Error al guardar código de barras"); }
+                                                    }}
+                                                    className="w-full bg-app-card border border-app-border rounded-lg px-2 py-1.5 text-xs font-mono text-app-text placeholder-app-text-muted/40 focus:outline-none focus:ring-1 focus:ring-violet-500/40"
+                                                />
                                             </div>
                                         </div>
                                     ))}
