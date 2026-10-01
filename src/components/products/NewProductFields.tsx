@@ -209,6 +209,9 @@ export default function NewProductFields({ initialData, onSaveSuccess, onCancel,
 
   const canEditStock = (!isEdit || user?.role === "ADMIN") && !form.has_variants;
   const canEditVariantStock = user?.role === "ADMIN";
+  // Cambiar unidad↔peso en un producto ya existente puede dejar el stock/historial
+  // en unidades mezcladas, así que solo ADMIN puede tocarlo después de creado.
+  const canEditUnitType = !isEdit || user?.role === "ADMIN";
 
   const fetchCategoriesAndSku = async () => {
     try {
@@ -622,8 +625,8 @@ export default function NewProductFields({ initialData, onSaveSuccess, onCancel,
               <div className="col-span-full">
                 <label className="block text-sm font-medium text-app-accent mb-1">Forma de Venta</label>
                 <select
-                  disabled={isEdit}
-                  className={`w-full border border-app-border rounded-xl px-4 py-3 focus:outline-none transition-all ${isEdit ? 'bg-app-bg/50 text-app-text-muted cursor-not-allowed' : 'bg-app-bg text-app-text focus:ring-2 focus:ring-app-accent/50'}`}
+                  disabled={!canEditUnitType}
+                  className={`w-full border border-app-border rounded-xl px-4 py-3 focus:outline-none transition-all ${!canEditUnitType ? 'bg-app-bg/50 text-app-text-muted cursor-not-allowed' : 'bg-app-bg text-app-text focus:ring-2 focus:ring-app-accent/50'}`}
                   value={form.unit_type}
                   onChange={(e) => setForm({ ...form, unit_type: e.target.value })}
                 >
