@@ -476,7 +476,18 @@ export default function NewProductFields({ initialData, onSaveSuccess, onCancel,
 
   return (
     <>
-    <form onSubmit={handleSubmit} className="bg-app-card border border-app-border rounded-2xl p-6 shadow-2xl">
+    <form
+      onSubmit={handleSubmit}
+      onKeyDown={(e) => {
+        // Un lector de código de barras termina el escaneo con un Enter — sin esto,
+        // ese Enter dispara el submit nativo del form (guarda el producto principal
+        // y cierra el modal) en vez de solo dejar el código escrito en su campo.
+        if (e.key === 'Enter' && (e.target as HTMLElement).tagName === 'INPUT') {
+          e.preventDefault();
+        }
+      }}
+      className="bg-app-card border border-app-border rounded-2xl p-6 shadow-2xl"
+    >
 
       {/* Banner post-creación */}
       {productJustCreated && (
