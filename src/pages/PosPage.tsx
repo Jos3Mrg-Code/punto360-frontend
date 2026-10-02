@@ -172,10 +172,14 @@ export default function PosPage() {
     } catch { /* silencioso */ }
   };
 
+  const fetchVariantMap = () => {
+    api.get("/products/variant-map").then(res => { variantMap.current = res.data; }).catch(() => {});
+  };
+
   useEffect(() => {
     fetchProducts();
     fetchCustomers();
-    api.get("/products/variant-map").then(res => { variantMap.current = res.data; }).catch(() => {});
+    fetchVariantMap();
     api.get("/companies/receipt-info").then(res => setReceiptInfo(res.data)).catch(() => {});
     api.get("/cash-registers/current")
       .then(res => {
@@ -186,6 +190,16 @@ export default function PosPage() {
         }
       })
       .catch(() => setHasCashSession(false));
+
+    // El catálogo (con stock) se carga una sola vez al abrir el POS; si la pantalla
+    // queda abierta un buen rato y otro dispositivo vende el mismo producto, el stock
+    // en pantalla queda desactualizado aunque el backend sí lo valide en tiempo real.
+    // Refrescamos cada 2 min para que lo que se ve coincida con lo que el backend aceptará.
+    const interval = setInterval(() => {
+      fetchProducts();
+      fetchVariantMap();
+    }, 120000);
+    return () => clearInterval(interval);
   }, []);
 
   const fetchProducts = async () => {
@@ -476,7 +490,21 @@ export default function PosPage() {
       fetchProducts();
       fetchShiftStats();
     } catch (error: any) {
-      alert(error.response?.data?.message || "Error al procesar la venta.");
+      const msg = error.response?.data?.message || "Error al procesar la venta.";
+      // El stock mostrado puede estar desactualizado (otra venta lo cambió mientras
+      // tanto); refrescamos y sacamos del carrito el ítem que ya no tiene el stock
+      // que la pantalla prometía, para no repetir el mismo error al reintentar.
+      if (typeof msg === "string" && msg.includes("Inventario insuficiente")) {
+        fetchProducts();
+        fetchVariantMap();
+        const productIdMatch = msg.match(/Producto ID: ([a-f0-9-]+)/i);
+        if (productIdMatch) {
+          setCart(prev => prev.filter(item => !(item.product.id === productIdMatch[1] && !item.variantId)));
+        }
+        toast.error(`${msg}. El inventario estaba desactualizado y ya se refrescó: vuelve a agregar el producto.`);
+      } else {
+        toast.error(msg);
+      }
     } finally {
       setIsProcessing(false);
     }
