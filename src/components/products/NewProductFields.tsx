@@ -976,7 +976,45 @@ export default function NewProductFields({ initialData, onSaveSuccess, onCancel,
                       </div>
                       <div className="flex items-center gap-3">
                         <div className="text-right">
-                          <p className="text-emerald-400 font-black text-sm">${Number(v.sale_price).toLocaleString()}</p>
+                          {canEditVariantStock ? (
+                            <div className="flex items-center gap-1 mb-1 justify-end">
+                              <input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                defaultValue={v.cost_price ?? 0}
+                                title="Precio de costo"
+                                onBlur={async (e) => {
+                                  const val = Number(e.target.value);
+                                  if (val === Number(v.cost_price ?? 0)) return;
+                                  try {
+                                    await api.put(`/products/${activeProductId}/variants/${v.id}`, { cost_price: val });
+                                    toast.success("Precio de costo actualizado");
+                                  } catch { toast.error("Error al guardar precio de costo"); }
+                                }}
+                                className="w-16 bg-app-bg border border-app-border rounded-lg px-1.5 py-0.5 text-[11px] text-center text-app-text-muted focus:outline-none focus:border-app-accent/50"
+                              />
+                              <span className="text-app-text-muted text-xs">/</span>
+                              <input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                defaultValue={v.sale_price ?? 0}
+                                title="Precio de venta"
+                                onBlur={async (e) => {
+                                  const val = Number(e.target.value);
+                                  if (val === Number(v.sale_price ?? 0)) return;
+                                  try {
+                                    await api.put(`/products/${activeProductId}/variants/${v.id}`, { sale_price: val });
+                                    toast.success("Precio de venta actualizado");
+                                  } catch { toast.error("Error al guardar precio de venta"); }
+                                }}
+                                className="w-16 bg-app-bg border border-app-border rounded-lg px-1.5 py-0.5 text-[11px] text-center text-emerald-400 font-bold focus:outline-none focus:border-app-accent/50"
+                              />
+                            </div>
+                          ) : (
+                            <p className="text-emerald-400 font-black text-sm">${Number(v.sale_price).toLocaleString()}</p>
+                          )}
                           {canEditVariantStock ? (
                             <input
                               type="number"
